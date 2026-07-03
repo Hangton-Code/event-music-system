@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Music — Now Playing</title>
+  <link rel="stylesheet" href="/host.css" />
+</head>
+<body>
+  <!-- One click here unlocks browser autoplay so audio reaches the AV system. -->
+  <div id="start-overlay">
+    <div class="start-card">
+      <div class="start-logo">🎶</div>
+      <h1>Event Music System</h1>
+      <p>Click to start the jukebox.</p>
+      <button id="start-btn">▶  Start</button>
+      <small>Make sure this window's audio goes to the venue's AV system.</small>
+    </div>
+  </div>
+
+  <main id="stage" class="hidden">
+    <section class="player-pane">
+      <div id="player-wrap">
+        <div id="player"></div>
+        <div id="idle" class="hidden">
+          <div class="idle-emoji">🎧</div>
+          <p>No songs in the queue.</p>
+          <p class="idle-sub">Scan the QR code to add the first one!</p>
+        </div>
+      </div>
+      <div id="now-meta">
+        <div id="now-title">—</div>
+        <div id="now-channel"></div>
+      </div>
+      <div id="controls">
+        <button id="playpause" title="Play / Pause (space)">⏸</button>
+        <button id="skip" title="Skip (n)">⏭</button>
+        <div class="vol">
+          <span>🔊</span>
+          <input id="volume" type="range" min="0" max="100" value="100" />
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="qr-card">
+        <div class="qr-title">Scan to add a song</div>
+        <img id="qr" alt="QR code" />
+        <div id="guest-url" class="guest-url"></div>
+        <div id="mod-badge" class="mod-badge hidden">✨ Gemini moderation on</div>
+      </div>
+      <div class="queue-card">
+        <div class="queue-head">
+          Up Next <span id="queue-count" class="count">0</span>
+        </div>
+        <ul id="queue"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="/host.js"></script>
+</body>
+</html>

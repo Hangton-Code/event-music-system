@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Add a Song</title>
+  <link rel="stylesheet" href="/guest.css" />
+</head>
+<body>
+  <header>
+    <h1>🎶 Add a Song</h1>
+    <p>Search YouTube and send a track to the party.</p>
+  </header>
+
+  <form id="search-form">
+    <input id="q" type="search" placeholder="Search for a song or artist…"
+           autocomplete="off" enterkeyhint="search" />
+    <button type="submit" id="search-btn">Search</button>
+  </form>
+
+  <div id="status" class="status hidden"></div>
+  <ul id="results"></ul>
+
+  <section class="queue-section">
+    <h2>Up Next <span id="queue-count" class="count">0</span></h2>
+    <div id="now-playing" class="now-playing hidden"></div>
+    <ul id="queue"></ul>
+  </section>
+
+  <!-- Toast for request results -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/guest.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+services:
+  event-music:
+    # Prebuilt image published by GitHub Actions on every push to main.
+    # To build locally from source instead, comment out `image:` and uncomment `build:`.
+    image: ghcr.io/hangton-code/event-music-system:latest
+    # build: .
+    container_name: event-music
+    restart: unless-stopped
+
+    # Host networking lets the app detect the server's real LAN IP for the QR
+    # code, and lets guests' phones reach it directly. (Linux only.)
+    # On Docker Desktop (Mac/Windows) host mode is limited — use the `ports`
+    # block below instead and set HOST_IP in .env to the server's LAN IP.
+    network_mode: host
+
+    # If NOT using host networking, uncomment this and remove network_mode above:
+    # ports:
+    #   - "3000:3000"
+
+    env_file:
+      - .env
+    environment:
+      PORT: ${PORT:-3000}
