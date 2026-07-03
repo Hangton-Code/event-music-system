@@ -71,13 +71,11 @@ crontab -e
 That's the fully hands-off setup: push changes to GitHub, the server picks them
 up and rebuilds on its own within 10 minutes.
 
-> **Networking notes**
-> - `docker-compose.yml` uses `network_mode: host` (Linux) so the app can detect
->   the server's real LAN IP and guests can reach it. On Docker Desktop
->   (Mac/Windows) host mode is limited — switch to the `ports:` block in the
->   compose file and set `HOST_IP` in `.env` to the server's LAN IP.
-> - If the detected IP is wrong (VPN/Docker/virtual interface), set `HOST_IP` in
->   `.env` explicitly.
+> **Networking note — set `HOST_IP`**
+> `docker-compose.yml` publishes the port (`45416:45416`). Because the container
+> can't see the server's real LAN IP from behind Docker's network, you **must set
+> `HOST_IP` in `.env`** to your server's LAN IP (e.g. `192.168.1.50`) — that's the
+> address the QR code sends guests to. Find it on the server with `hostname -I`.
 
 ## Optional: turn on Gemini moderation
 

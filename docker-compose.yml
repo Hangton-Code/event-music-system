@@ -4,11 +4,14 @@ services:
     container_name: event-music
     restart: unless-stopped
 
-    # Host networking lets the app detect the server's real LAN IP for the QR
-    # code, and lets guests' phones reach it directly. (Linux servers only.)
-    network_mode: host
+    # Publish the port explicitly (host:container).
+    ports:
+      - "${PORT:-45416}:${PORT:-45416}"
 
     env_file:
       - .env
     environment:
       PORT: ${PORT:-45416}
+      # With published ports the container can't see the server's real LAN IP,
+      # so HOST_IP (set in .env) is what the QR code uses. Required.
+      HOST_IP: ${HOST_IP:-}
