@@ -33,7 +33,7 @@ cp .env.example .env      # defaults are fine — moderation is off
 bun start
 ```
 
-Open **http://localhost:3000/** on the machine and drag it to the projector
+Open **http://localhost:45416/** on the machine and drag it to the projector
 (fullscreen recommended). Click **Start** once to unlock audio.
 
 ## Run on a home server (Docker)
@@ -48,7 +48,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Then browse to `http://<server-lan-ip>:3000/`. The QR code guests scan points at
+Then browse to `http://<server-lan-ip>:45416/`. The QR code guests scan points at
 the same server, so their phones reach it directly.
 
 ### Keeping it updated

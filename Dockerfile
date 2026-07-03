@@ -14,7 +14,7 @@ COPY public ./public
 COPY scripts ./scripts
 
 ENV NODE_ENV=production
-ENV PORT=3000
-EXPOSE 3000
+ENV PORT=45416
+EXPOSE 45416
 
 CMD ["bun", "server.js"]

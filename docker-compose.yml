@@ -11,4 +11,4 @@ services:
     env_file:
       - .env
     environment:
-      PORT: ${PORT:-3000}
+      PORT: ${PORT:-45416}

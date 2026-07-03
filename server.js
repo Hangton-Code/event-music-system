@@ -34,7 +34,7 @@ if (existsSync(envPath)) {
   }
 }
 
-const PORT = parseInt(process.env.PORT || "3000", 10);
+const PORT = parseInt(process.env.PORT || "45416", 10);
 const LAN_IP = detectLanIp(process.env.HOST_IP);
 const GUEST_URL = `http://${LAN_IP}:${PORT}/guest`;
 // Moderation is opt-in: only runs when explicitly enabled AND a key is present.
