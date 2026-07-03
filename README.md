@@ -38,25 +38,38 @@ Open **http://localhost:3000/** on the machine and drag it to the projector
 
 ## Run on a home server (Docker)
 
-The image is built automatically by GitHub Actions and published to GHCR on
-every push, so the server just pulls the latest:
+The server builds the image itself from source — no registry, no logins.
 
 ```bash
-# on the home server
+# on the home server (one-time setup)
 git clone git@github.com:Hangton-Code/event-music-system.git
 cd event-music-system
 cp .env.example .env
-docker compose up -d
-```
-
-To update after new changes land on `main`:
-
-```bash
-docker compose pull && docker compose up -d
+docker compose up -d --build
 ```
 
 Then browse to `http://<server-lan-ip>:3000/`. The QR code guests scan points at
 the same server, so their phones reach it directly.
+
+### Keeping it updated
+
+**Manual** — whenever new changes land on `main`:
+
+```bash
+git pull && docker compose up -d --build
+```
+
+**Automatic** — `update.sh` does the pull-and-rebuild only when something
+changed. Run it on a schedule with cron. For example, checking every 10 minutes:
+
+```bash
+crontab -e
+# add this line (fix the path to where you cloned the repo):
+*/10 * * * * /home/youruser/event-music-system/update.sh >> /home/youruser/event-music-system/update.log 2>&1
+```
+
+That's the fully hands-off setup: push changes to GitHub, the server picks them
+up and rebuilds on its own within 10 minutes.
 
 > **Networking notes**
 > - `docker-compose.yml` uses `network_mode: host` (Linux) so the app can detect
@@ -122,6 +135,6 @@ public/host.*              Projector page
 public/guest.*             Mobile page
 scripts/check-gemini.mjs   List models + test moderation
 Dockerfile                 Bun-based image
-docker-compose.yml         Home-server deployment (pulls from GHCR)
-.github/workflows/         CI: build & publish image on push
+docker-compose.yml         Home-server deployment (builds locally)
+update.sh                  Auto-update: git pull + rebuild if changed
 ```
