@@ -36,20 +36,29 @@ bun start
 Open **http://localhost:45416/** on the machine and drag it to the projector
 (fullscreen recommended). Click **Start** once to unlock audio.
 
-## Run on a home server (Docker)
+## Run on a home server (Docker + reverse proxy)
 
-The server builds the image itself from source — no registry, no logins.
+The server builds the image itself from source — no registry, no logins. It runs
+behind a reverse proxy that handles the domain and HTTPS.
 
 ```bash
 # on the home server (one-time setup)
 git clone git@github.com:Hangton-Code/event-music-system.git
 cd event-music-system
-cp .env.example .env
+cp .env.example .env          # set PUBLIC_URL to your domain
 docker compose up -d --build
 ```
 
-Then browse to `http://<server-lan-ip>:45416/`. The QR code guests scan points at
-the same server, so their phones reach it directly.
+The container joins the external `reverseproxy` Docker network and exposes port
+`45416` on it. Point your reverse proxy at `event-music:45416` for the domain,
+and set `PUBLIC_URL` in `.env` to that domain (e.g.
+`https://grad-din-music.hangton.net`). The QR code guests scan uses `PUBLIC_URL`.
+
+> The `reverseproxy` network must already exist (it does if your proxy created
+> it). If not: `docker network create reverseproxy`.
+
+Then browse to your domain — that's the projector page. Guests scan the QR and
+reach the same domain from their phones.
 
 ### Keeping it updated
 
@@ -71,11 +80,11 @@ crontab -e
 That's the fully hands-off setup: push changes to GitHub, the server picks them
 up and rebuilds on its own within 10 minutes.
 
-> **Networking note — set `HOST_IP`**
-> `docker-compose.yml` publishes the port (`45416:45416`). Because the container
-> can't see the server's real LAN IP from behind Docker's network, you **must set
-> `HOST_IP` in `.env`** to your server's LAN IP (e.g. `192.168.1.50`) — that's the
-> address the QR code sends guests to. Find it on the server with `hostname -I`.
+> **Networking note — set `PUBLIC_URL`**
+> Because the QR code is a link guests open on their phones, it must contain the
+> public address, not an internal one. Behind the reverse proxy, set `PUBLIC_URL`
+> in `.env` to your domain (`https://grad-din-music.hangton.net`). The reverse
+> proxy must also forward **WebSocket upgrades** (the live queue uses `wss://`).
 
 ## Optional: turn on Gemini moderation
 

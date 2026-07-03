@@ -4,14 +4,20 @@ services:
     container_name: event-music
     restart: unless-stopped
 
-    # Publish the port explicitly (host:container).
-    ports:
-      - "${PORT:-45416}:${PORT:-45416}"
+    # Join the reverse proxy's network so it can route to this container by name
+    # (event-music:45416). The proxy terminates TLS and serves the public domain.
+    networks:
+      - reverseproxy
+    expose:
+      - "${PORT:-45416}"
 
     env_file:
       - .env
     environment:
       PORT: ${PORT:-45416}
-      # With published ports the container can't see the server's real LAN IP,
-      # so HOST_IP (set in .env) is what the QR code uses. Required.
-      HOST_IP: ${HOST_IP:-}
+      # Public address the QR code points guests to (your reverse-proxy domain).
+      PUBLIC_URL: ${PUBLIC_URL:-}
+
+networks:
+  reverseproxy:
+    external: true

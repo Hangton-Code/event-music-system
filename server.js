@@ -36,7 +36,10 @@ if (existsSync(envPath)) {
 
 const PORT = parseInt(process.env.PORT || "45416", 10);
 const LAN_IP = detectLanIp(process.env.HOST_IP);
-const GUEST_URL = `http://${LAN_IP}:${PORT}/guest`;
+// PUBLIC_URL (e.g. https://grad-din-music.hangton.net) takes precedence when the
+// app runs behind a reverse proxy. Otherwise fall back to LAN IP + port.
+const PUBLIC_BASE = (process.env.PUBLIC_URL || "").replace(/\/+$/, "");
+const GUEST_URL = PUBLIC_BASE ? `${PUBLIC_BASE}/guest` : `http://${LAN_IP}:${PORT}/guest`;
 // Moderation is opt-in: only runs when explicitly enabled AND a key is present.
 const MODERATION_ON =
   String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true" &&
