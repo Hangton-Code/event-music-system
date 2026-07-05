@@ -64,23 +64,55 @@ reach the same domain from their phones.
 
 ### Keeping it updated
 
-**Manual** — whenever new changes land on `main`:
+**Push-to-deploy (recommended)** — a self-hosted GitHub Actions runner on the
+home server rebuilds automatically on every push to `main`. See
+[Auto-deploy setup](#auto-deploy-self-hosted-runner) below.
+
+**Manual** — whenever you want:
 
 ```bash
 git pull && docker compose up -d --build
 ```
 
-**Automatic** — `update.sh` does the pull-and-rebuild only when something
-changed. Run it on a schedule with cron. For example, checking every 10 minutes:
+**Cron (alternative to the runner)** — `update.sh` pulls and rebuilds only when
+something changed. Use this *instead of* the runner if you'd rather poll:
 
 ```bash
 crontab -e
-# add this line (fix the path to where you cloned the repo):
-*/10 * * * * /home/youruser/event-music-system/update.sh >> /home/youruser/event-music-system/update.log 2>&1
+# */10 * * * * /home/youruser/event-music-system/update.sh >> ~/event-music.log 2>&1
 ```
 
-That's the fully hands-off setup: push changes to GitHub, the server picks them
-up and rebuilds on its own within 10 minutes.
+> Use the runner **or** cron, not both — otherwise a push and a cron tick can
+> rebuild on top of each other.
+
+## Auto-deploy (self-hosted runner)
+
+The workflow in `.github/workflows/deploy.yml` runs on a runner installed on the
+home server. One-time setup:
+
+1. **Register the runner** — on GitHub: repo → **Settings → Actions → Runners →
+   New self-hosted runner**, pick Linux, and run the shown commands **on the home
+   server, as the same user that owns your clone**:
+   ```bash
+   # (in a fresh ~/actions-runner dir, per GitHub's instructions)
+   ./config.sh --url https://github.com/Hangton-Code/event-music-system --token <TOKEN>
+   sudo ./svc.sh install <youruser>   # run as a service so it survives reboots
+   sudo ./svc.sh start
+   ```
+2. **Docker access** — the runner's user must be able to run Docker:
+   `sudo usermod -aG docker <youruser>` (re-login after).
+3. **Clone location** — the workflow deploys in `~/event-music-system` by default.
+   If your clone is elsewhere, set a repo **Variable** `DEPLOY_DIR` (Settings →
+   Actions → Variables) to its path.
+
+Now every `git push` to `main` rebuilds on the server within seconds. Trigger a
+deploy manually anytime from the repo's **Actions** tab (**Run workflow**).
+
+> **Security note:** self-hosted runners + a **public** repo need care. This
+> workflow only triggers on direct pushes to `main` and manual dispatch (never
+> on `pull_request`), so forks can't execute code on your runner. Don't add
+> `pull_request` triggers on the self-hosted runner while the repo is public —
+> or make the repo private for extra safety.
 
 > **Networking note — set `PUBLIC_URL`**
 > Because the QR code is a link guests open on their phones, it must contain the

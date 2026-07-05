@@ -1,0 +1,37 @@
+name: Deploy to home server
+
+# Push-to-deploy via a SELF-HOSTED runner installed on the home server.
+# On every push to main, the runner (on your box) pulls the latest code and
+# rebuilds the container. No inbound ports, no SSH, no image registry.
+#
+# Triggers are push-only + manual — never pull_request — so forks of this public
+# repo cannot run code on your runner. Keep it that way while the repo is public.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys overlap; queue them instead.
+concurrency:
+  group: deploy-home-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Pull latest and rebuild
+        env:
+          # Optional: set repo variable DEPLOY_DIR (Settings → Actions → Variables)
+          # if your clone isn't at ~/event-music-system.
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+        run: |
+          set -euo pipefail
+          cd "${DEPLOY_DIR:-$HOME/event-music-system}"
+          echo "Deploying in $(pwd)"
+          git fetch --all --prune
+          git reset --hard origin/main        # untracked .env is preserved
+          docker compose up -d --build
+          docker image prune -f
+          echo "Deployed $(git rev-parse --short HEAD)"
