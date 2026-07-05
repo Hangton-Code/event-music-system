@@ -9,9 +9,12 @@
 //    the first {...} block from the reply.
 //  - We do NOT set `temperature` (kimi-k2.x rejects arbitrary values); the API
 //    default is used unless LLM_TEMPERATURE is set explicitly.
-//  - FAIL-OPEN: missing key, HTTP error, timeout, or unparseable reply all
-//    resolve to { approved: true }. A moderation hiccup never stops the party
-//    and never throws into the request path.
+//  - FAIL-OPEN only for infrastructure failures (missing key, HTTP error,
+//    timeout): a moderation outage never stops the party and never throws
+//    into the request path.
+//  - FAIL-CLOSED when the model answers but gives no verdict: provider
+//    content_filter censorship or a reply without valid {"approved": ...}
+//    JSON both mean the model dodged the question — reject the song.
 
 function config(opts = {}) {
   return {
@@ -113,10 +116,12 @@ export async function moderate(song, details = null, opts = {}) {
       console.warn(`[moderation] provider content_filter — rejecting. ${text.slice(0, 150)}`);
       return { approved: false, reason: "Not a good fit for this event.", moderated: true };
     }
+    // No structured verdict (refusal prose, missing/invalid JSON): the model
+    // dodged the question — reject. Only infrastructure failures fail open.
     const parsed = extractJson(text);
     if (!parsed || typeof parsed.approved !== "boolean") {
-      console.warn(`[moderation] unparseable reply — failing open. ${text.slice(0, 150)}`);
-      return APPROVED;
+      console.warn(`[moderation] no structured verdict — rejecting. ${text.slice(0, 150)}`);
+      return { approved: false, reason: "Not a good fit for this event.", moderated: true };
     }
     return {
       approved: parsed.approved,
