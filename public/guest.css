@@ -11,6 +11,8 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+.hidden { display: none !important; }
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -80,25 +82,65 @@ header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
   font-weight: 600;
 }
 
-.suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
-.sug-tile {
-  position: relative;
+/* Singer row — horizontally scrollable avatar chips */
+.singers {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.2rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.singers::-webkit-scrollbar { display: none; }
+.singer-chip {
+  flex-shrink: 0;
+  background: none;
   border: none;
-  border-radius: 14px;
-  padding: 0.8rem 0.85rem 0.75rem;
-  min-height: 4.6rem;
-  color: white;
-  text-align: left;
-  line-height: 1.25;
+  color: var(--muted);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  overflow: hidden;
+  align-items: center;
+  gap: 0.3rem;
+  width: 4rem;
 }
-.sug-tile:active { filter: brightness(1.15); }
-.tile-emoji { position: absolute; top: 0.45rem; right: 0.55rem; font-size: 1.3rem; opacity: 0.9; }
-.tile-title { font-weight: 700; font-size: 0.95rem; }
-.tile-artist { font-size: 0.75rem; opacity: 0.85; margin-top: 0.15rem; }
+.singer-avatar {
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: white;
+  border: 2px solid transparent;
+}
+.singer-chip.active .singer-avatar { border-color: white; box-shadow: 0 0 0 2px var(--accent); }
+.singer-chip.active .singer-name { color: var(--text); font-weight: 600; }
+.singer-name {
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 4rem;
+}
+
+/* "More songs" button under browse results */
+.more {
+  display: block;
+  width: 100%;
+  margin: 0.8rem 0;
+  padding: 0.7rem;
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.more:disabled { opacity: 0.5; }
+.more.hidden { display: none; }
+
 /* Genre gradients, KTV-screen palette */
 .g-kpop { background: linear-gradient(135deg, #a855f7, #ec4899); }
 .g-canto { background: linear-gradient(135deg, #ef4444, #f97316); }

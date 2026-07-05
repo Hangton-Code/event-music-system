@@ -69,6 +69,27 @@ app.get("/api/info", async (_req, res) => {
   }
 });
 
+// Explore/browse: same YouTube search, but cached. The guest page's genre tabs
+// and singer chips all hit the same canned queries, so one scrape serves every
+// guest for the TTL instead of hammering YouTube per tap.
+const browseCache = new Map(); // query -> { at, results }
+const BROWSE_TTL_MS = 30 * 60 * 1000;
+app.get("/api/browse", async (req, res) => {
+  const q = (req.query.q || "").toString().trim().slice(0, 100);
+  if (!q) return res.json({ results: [] });
+  const hit = browseCache.get(q);
+  if (hit && Date.now() - hit.at < BROWSE_TTL_MS) return res.json({ results: hit.results });
+  try {
+    const results = await searchYouTube(q, { limit: 20 });
+    browseCache.set(q, { at: Date.now(), results });
+    if (browseCache.size > 200) browseCache.delete(browseCache.keys().next().value);
+    res.json({ results });
+  } catch (err) {
+    console.error("[browse]", err.message);
+    res.status(502).json({ error: "Couldn't load songs. Try again." });
+  }
+});
+
 app.get("/api/search", async (req, res) => {
   const q = (req.query.q || "").toString().trim();
   if (!q) return res.json({ results: [] });
