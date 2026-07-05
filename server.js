@@ -74,13 +74,24 @@ app.get("/api/info", async (_req, res) => {
 // guest for the TTL instead of hammering YouTube per tap.
 const browseCache = new Map(); // query -> { at, results }
 const BROWSE_TTL_MS = 30 * 60 * 1000;
+
+// Browse is for singles only: hour-long "100 songs" compilation videos pass
+// YouTube's videos-only search filter, but no single track runs this long.
+const MAX_SINGLE_SECONDS = 10 * 60;
+function durationSeconds(d) {
+  if (!d || !/^[\d:]+$/.test(d)) return Infinity; // "LIVE"/unknown → not a single
+  return d.split(":").reduce((acc, part) => acc * 60 + Number(part), 0);
+}
+
 app.get("/api/browse", async (req, res) => {
   const q = (req.query.q || "").toString().trim().slice(0, 100);
   if (!q) return res.json({ results: [] });
   const hit = browseCache.get(q);
   if (hit && Date.now() - hit.at < BROWSE_TTL_MS) return res.json({ results: hit.results });
   try {
-    const results = await searchYouTube(q, { limit: 20 });
+    const results = (await searchYouTube(q, { limit: 40 }))
+      .filter((r) => durationSeconds(r.duration) <= MAX_SINGLE_SECONDS)
+      .slice(0, 20);
     browseCache.set(q, { at: Date.now(), results });
     if (browseCache.size > 200) browseCache.delete(browseCache.keys().next().value);
     res.json({ results });

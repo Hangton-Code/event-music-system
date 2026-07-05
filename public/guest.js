@@ -10,15 +10,19 @@ const sugSection = document.getElementById("suggestions-section");
 // Genre tabs and singer chips run canned YouTube queries via /api/browse
 // (cached server-side), so the songs shown are real and current — not a
 // hardcoded list. "More songs" walks through the query variants.
+// Query phrasing matters: "Official MV"-style queries surface real singles,
+// while generic "熱門歌 2026" queries surface hour-long compilation videos
+// (which the server's duration filter then rejects, leaving nothing).
 const GENRE_QUERIES = {
-  All: ["2026 hit songs official MV", "廣東歌 熱門 MV", "K-pop hits MV", "party anthems official MV"],
-  "K-pop": ["K-pop hits 2026 MV", "K-pop dance hits official MV", "K-pop girl group hits MV"],
-  Cantopop: ["廣東歌 2026 熱門 MV", "廣東歌 經典金曲 MV", "香港流行曲 熱門 MV"],
-  Mandopop: ["華語流行 金曲 MV", "華語 2026 新歌 MV", "國語經典歌曲 MV"],
-  Western: ["top pop hits official MV", "billboard hits 2026", "classic pop anthems MV"],
-  Party: ["party dance hits official MV", "EDM party anthems MV", "dancefloor classics MV"],
+  All: ["2026 hit songs official MV", "廣東歌 Official MV 2026", "K-pop official MV 2026", "party anthems official MV"],
+  "K-pop": ["K-pop official MV 2026", "K-pop dance official MV", "K-pop girl group official MV"],
+  Cantopop: ["廣東歌 Official MV 2026", "香港歌手 新歌 Official MV", "Cantopop official MV"],
+  Mandopop: ["華語 新歌 Official MV", "華語流行 Official MV 2026", "國語 經典 Official MV"],
+  Western: ["top pop hits official MV", "pop official music video 2026", "classic pop anthems official MV"],
+  Party: ["party dance hits official MV", "EDM anthems official MV", "dancefloor classics official MV"],
 };
 const GENRE_EMOJI = { All: "🔥", "K-pop": "💜", Cantopop: "🎤", Mandopop: "🎵", Western: "🎧", Party: "🪩" };
+const GENRE_SLUG = { "K-pop": "kpop", Cantopop: "canto", Mandopop: "mando", Western: "western", Party: "party" };
 
 const SINGERS = [
   { n: "陳奕迅", q: "陳奕迅 Eason Chan", g: "canto" },
@@ -38,10 +42,15 @@ const SINGERS = [
   { n: "Bruno Mars", q: "Bruno Mars", g: "western" },
   { n: "Ed Sheeran", q: "Ed Sheeran", g: "western" },
   { n: "The Weeknd", q: "The Weeknd", g: "western" },
+  { n: "Calvin Harris", q: "Calvin Harris", g: "party" },
+  { n: "David Guetta", q: "David Guetta", g: "party" },
+  { n: "Avicii", q: "Avicii", g: "party" },
+  { n: "Black Eyed Peas", q: "Black Eyed Peas", g: "party" },
 ];
 
 const moreBtn = document.getElementById("more");
-let activeKey = "genre:All"; // "genre:<name>" or "singer:<name>"
+let activeGenre = "All"; // which tab is selected — also filters the singer row
+let activeKey = "genre:All"; // "genre:<name>" or "singer:<name>" (highlight)
 const browse = { queries: [], idx: 0, seen: new Set() };
 
 function renderGenreTabs() {
@@ -59,7 +68,9 @@ function renderGenreTabs() {
 function renderSingers() {
   const row = document.getElementById("singers");
   row.innerHTML = "";
-  for (const s of SINGERS) {
+  const list =
+    activeGenre === "All" ? SINGERS : SINGERS.filter((s) => s.g === GENRE_SLUG[activeGenre]);
+  for (const s of list) {
     const btn = document.createElement("button");
     btn.className = `singer-chip${activeKey === `singer:${s.n}` ? " active" : ""}`;
     btn.innerHTML = `<span class="singer-avatar g-${s.g}"></span><span class="singer-name"></span>`;
@@ -71,6 +82,7 @@ function renderSingers() {
 }
 
 function selectGenre(g) {
+  activeGenre = g;
   activeKey = `genre:${g}`;
   renderGenreTabs();
   renderSingers();
@@ -81,7 +93,7 @@ function selectSinger(s) {
   activeKey = `singer:${s.n}`;
   renderGenreTabs();
   renderSingers();
-  startBrowse([`${s.q} official MV`, `${s.q} 熱門歌曲 MV`, `${s.q} greatest hits`]);
+  startBrowse([`${s.q} official MV`, `${s.q} music video`, `${s.q} MV`]);
 }
 
 async function startBrowse(queries) {
