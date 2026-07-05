@@ -38,16 +38,49 @@ const SUGGESTIONS = [
   { a: "David Guetta", t: "Titanium", g: "Party" },
 ];
 
+// KTV-style browsing: genre tabs + colorful song tiles.
+const GENRES = {
+  "K-pop": { emoji: "💜", slug: "kpop" },
+  Cantopop: { emoji: "🎤", slug: "canto" },
+  Mandopop: { emoji: "🎵", slug: "mando" },
+  Western: { emoji: "🎧", slug: "western" },
+  Party: { emoji: "🪩", slug: "party" },
+};
+let activeGenre = "All";
+
+function renderGenreTabs() {
+  const bar = document.getElementById("genre-tabs");
+  bar.innerHTML = "";
+  for (const g of ["All", ...Object.keys(GENRES)]) {
+    const btn = document.createElement("button");
+    btn.className = "genre-tab" + (g === activeGenre ? " active" : "");
+    btn.textContent = g === "All" ? "All" : `${GENRES[g].emoji} ${g}`;
+    btn.onclick = () => {
+      activeGenre = g;
+      renderGenreTabs();
+      renderSuggestions();
+    };
+    bar.appendChild(btn);
+  }
+}
+
 function renderSuggestions() {
-  const picks = [...SUGGESTIONS].sort(() => Math.random() - 0.5).slice(0, 8);
+  // "All" shows a random 8 across genres; a genre tab shows all of its songs.
+  const picks =
+    activeGenre === "All"
+      ? [...SUGGESTIONS].sort(() => Math.random() - 0.5).slice(0, 8)
+      : SUGGESTIONS.filter((s) => s.g === activeGenre);
   const box = document.getElementById("suggestions");
   box.innerHTML = "";
   for (const s of picks) {
     const btn = document.createElement("button");
-    btn.className = "sug-chip";
-    btn.innerHTML = `<span class="sug-genre"></span><span class="sug-name"></span>`;
-    btn.querySelector(".sug-genre").textContent = s.g;
-    btn.querySelector(".sug-name").textContent = `${s.a} – ${s.t}`;
+    btn.className = `sug-tile g-${GENRES[s.g].slug}`;
+    btn.innerHTML = `
+      <span class="tile-emoji">${GENRES[s.g].emoji}</span>
+      <span class="tile-title"></span>
+      <span class="tile-artist"></span>`;
+    btn.querySelector(".tile-title").textContent = s.t;
+    btn.querySelector(".tile-artist").textContent = s.a;
     btn.onclick = () => {
       qEl.value = `${s.a} ${s.t}`;
       doSearch(qEl.value);
@@ -56,7 +89,11 @@ function renderSuggestions() {
   }
 }
 
-document.getElementById("shuffle").onclick = renderSuggestions;
+document.getElementById("shuffle").onclick = () => {
+  activeGenre = "All";
+  renderGenreTabs();
+  renderSuggestions();
+};
 
 // ---- Search -----------------------------------------------------------
 document.getElementById("search-form").addEventListener("submit", (e) => {
@@ -183,5 +220,6 @@ function renderQueue(state) {
   });
 }
 
+renderGenreTabs();
 renderSuggestions();
 connectWs();

@@ -48,23 +48,63 @@ header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
 
 .status { text-align: center; color: var(--muted); padding: 1rem; }
 
-/* Suggestions */
+/* Suggestions — KTV-style genre tabs + colorful tiles */
 #suggestions-section { margin: 1rem 0 0.5rem; }
 .sug-head { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 0.6rem; }
 .shuffle { background: none; border: 1px solid #ffffff20; color: var(--text); border-radius: 999px; padding: 0.3rem 0.7rem; font-size: 0.85rem; }
-.suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.sug-chip {
-  border: 1px solid #ffffff1a;
-  background: var(--panel);
-  color: var(--text);
-  border-radius: 12px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  text-align: left;
-  line-height: 1.2;
+
+.genre-tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.2rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
-.sug-chip .sug-genre { display: block; font-size: 0.7rem; color: var(--accent-2); margin-bottom: 0.15rem; }
-.sug-chip:active { background: var(--panel-2); }
+.genre-tabs::-webkit-scrollbar { display: none; }
+.genre-tab {
+  flex-shrink: 0;
+  border: 1px solid #ffffff20;
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.genre-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+  color: white;
+  font-weight: 600;
+}
+
+.suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.sug-tile {
+  position: relative;
+  border: none;
+  border-radius: 14px;
+  padding: 0.8rem 0.85rem 0.75rem;
+  min-height: 4.6rem;
+  color: white;
+  text-align: left;
+  line-height: 1.25;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.sug-tile:active { filter: brightness(1.15); }
+.tile-emoji { position: absolute; top: 0.45rem; right: 0.55rem; font-size: 1.3rem; opacity: 0.9; }
+.tile-title { font-weight: 700; font-size: 0.95rem; }
+.tile-artist { font-size: 0.75rem; opacity: 0.85; margin-top: 0.15rem; }
+/* Genre gradients, KTV-screen palette */
+.g-kpop { background: linear-gradient(135deg, #a855f7, #ec4899); }
+.g-canto { background: linear-gradient(135deg, #ef4444, #f97316); }
+.g-mando { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.g-western { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+.g-party { background: linear-gradient(135deg, #8b5cf6, #3b82f6); }
 
 #results, #queue { list-style: none; }
 

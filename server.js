@@ -47,7 +47,13 @@ let filterOn = String(process.env.ENABLE_MODERATION || "").toLowerCase() === "tr
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    // Force revalidation on every load (cheap 304s via ETag). Without this,
+    // iOS Safari holds onto stale JS/CSS across deploys.
+    setHeaders: (res) => res.setHeader("Cache-Control", "no-cache"),
+  })
+);
 
 const state = new JukeboxState();
 
