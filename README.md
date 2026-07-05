@@ -18,8 +18,10 @@ to the venue's AV system.
 ## Features
 
 - **No YouTube API key** — search works out of the box (results-page scraping).
-- **Accepts all songs by default** — no gatekeeping. Optional Gemini moderation
-  can be switched on later (see below).
+- **Accepts all songs by default** — no gatekeeping. An optional LLM content
+  filter (Kimi by default) can be toggled on live from the host page.
+- **Song suggestions** — the guest page shows tappable hits across K-pop,
+  Cantopop, Mandopop, Western, and party genres, reshuffled on demand.
 - **Playability pre-check** — deleted/private videos are rejected before queuing;
   embed-disabled/region-locked videos are auto-skipped by the player.
 - **Live queue** over WebSocket on both the projector and every phone.
@@ -86,20 +88,30 @@ up and rebuilds on its own within 10 minutes.
 > in `.env` to your domain (`https://grad-din-music.hangton.net`). The reverse
 > proxy must also forward **WebSocket upgrades** (the live queue uses `wss://`).
 
-## Optional: turn on Gemini moderation
+## Optional: the content filter (LLM moderation)
 
-Off by default. To have Gemini reject non-music / explicit-titled requests:
+Off by default, and **toggled live from the host page** (the 🛡 Filter button).
+When on, each request is enriched with the video's **YouTube category,
+`isFamilySafe` flag, and description**, then an LLM decides whether to allow it.
+Rejected guests see the reason.
 
-1. Get a free key at <https://aistudio.google.com/apikey>.
-2. In `.env`, set `ENABLE_MODERATION=true` and `GEMINI_API_KEY=...`.
-3. Verify the key and list models: `bun run check-gemini`.
+Uses any **OpenAI-compatible** API — **Kimi (Moonshot)** by default:
+
+1. Get a key at <https://platform.moonshot.ai>.
+2. In `.env`, set `LLM_API_KEY=...` (base URL and model default to Kimi).
+   Optionally set `ENABLE_MODERATION=true` to have it start on.
+3. Verify the key and list models: `bun run check-llm`.
 4. Set `MODERATION_MODE=strict` for family-friendly-only filtering.
 
-It *fails open*: if Gemini is unavailable, music keeps flowing.
+Swap providers by changing three values — e.g. DeepSeek
+(`https://api.deepseek.com/v1`) or GLM. No code changes.
 
-> **Caveat:** Gemini judges on the video's **title and channel only**. It catches
-> obvious non-music and explicit *titles*, but not explicit audio hidden under an
-> innocent title.
+It *fails open*: no key, an API error, or a timeout all fall back to accepting
+the song, so the filter can never stop the music.
+
+> **Caveat:** the filter reads the title, channel, category, and description —
+> not the actual audio. It catches non-music and explicit metadata, but not
+> explicit lyrics hidden under a clean title/description.
 
 ## ⚠️ The #1 thing that breaks at events: the network
 
@@ -134,13 +146,13 @@ and broadcasts the new state to everyone.
 
 ```
 server.js                  Express + WebSocket server, request pipeline
-src/youtube.js             No-key search scraping + oEmbed playability check
-src/gemini.js              Gemini moderation (optional, fail-open)
+src/youtube.js             No-key search scraping, oEmbed check, watch-page details
+src/moderation.js          LLM content filter (OpenAI-compatible, optional, fail-open)
 src/state.js               Authoritative in-memory queue
 src/net.js                 LAN IP detection
-public/host.*              Projector page
-public/guest.*             Mobile page
-scripts/check-gemini.mjs   List models + test moderation
+public/host.*              Projector page (with filter toggle)
+public/guest.*             Mobile page (search + suggestions)
+scripts/check-llm.mjs      List models + test moderation
 Dockerfile                 Bun-based image
 docker-compose.yml         Home-server deployment (builds locally)
 update.sh                  Auto-update: git pull + rebuild if changed

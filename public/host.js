@@ -6,6 +6,8 @@ let playerReady = false;
 let started = false;
 let currentVideoId = null;
 let latestState = { nowPlaying: null, queue: [] };
+let filterOn = false;
+let moderationConfigured = false;
 let ws = null;
 
 // ---- WebSocket --------------------------------------------------------
@@ -16,7 +18,9 @@ function connectWs() {
     const msg = JSON.parse(e.data);
     if (msg.type === "state") {
       latestState = msg.state;
+      if (typeof msg.filterOn === "boolean") filterOn = msg.filterOn;
       render();
+      renderFilter();
       syncPlayer();
     }
   };
@@ -106,6 +110,14 @@ function render() {
   }
 }
 
+function renderFilter() {
+  const btn = document.getElementById("filter-toggle");
+  btn.textContent = `🛡 Filter: ${filterOn ? "ON" : "OFF"}`;
+  btn.classList.toggle("on", filterOn);
+  // Warn if the filter is on but no LLM key is configured (it'll accept all).
+  document.getElementById("filter-hint").classList.toggle("hidden", !(filterOn && !moderationConfigured));
+}
+
 function updatePlayPauseIcon() {
   if (!playerReady) return;
   const playing = player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING;
@@ -121,6 +133,7 @@ function wireControls() {
     else player.playVideo();
   };
   document.getElementById("skip").onclick = () => send({ type: "skip" });
+  document.getElementById("filter-toggle").onclick = () => send({ type: "setFilter", on: !filterOn });
   document.getElementById("volume").oninput = (e) => {
     if (playerReady) player.setVolume(parseInt(e.target.value, 10));
   };
@@ -136,7 +149,9 @@ async function loadInfo() {
     const info = await (await fetch("/api/info")).json();
     document.getElementById("qr").src = info.qr;
     document.getElementById("guest-url").textContent = info.guestUrl.replace(/^https?:\/\//, "");
-    if (info.moderation) document.getElementById("mod-badge").classList.remove("hidden");
+    filterOn = !!info.filterOn;
+    moderationConfigured = !!info.moderationConfigured;
+    renderFilter();
   } catch (err) {
     document.getElementById("guest-url").textContent = "Could not load guest link";
   }

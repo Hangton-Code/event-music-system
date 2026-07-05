@@ -35,6 +35,8 @@
       <div id="controls">
         <button id="playpause" title="Play / Pause (space)">⏸</button>
         <button id="skip" title="Skip (n)">⏭</button>
+        <button id="filter-toggle" class="pill" title="Content filter (LLM)">🛡 Filter: OFF</button>
+        <span id="filter-hint" class="filter-hint hidden">no LLM key — accepts all</span>
         <div class="vol">
           <span>🔊</span>
           <input id="volume" type="range" min="0" max="100" value="100" />
@@ -47,7 +49,6 @@
         <div class="qr-title">Scan to add a song</div>
         <img id="qr" alt="QR code" />
         <div id="guest-url" class="guest-url"></div>
-        <div id="mod-badge" class="mod-badge hidden">✨ Gemini moderation on</div>
       </div>
       <div class="queue-card">
         <div class="queue-head">

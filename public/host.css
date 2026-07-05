@@ -120,6 +120,19 @@ html, body {
 .vol { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; color: var(--muted); }
 .vol input { accent-color: var(--accent); }
 
+/* Filter toggle pill */
+#controls button.pill {
+  width: auto;
+  border-radius: 999px;
+  padding: 0 1rem;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  background: var(--panel-2);
+}
+#controls button.pill.on { background: #1f7a4d; }
+#controls button.pill.on:hover { background: #248a58; }
+.filter-hint { font-size: 0.8rem; color: var(--accent); }
+
 /* ---- Sidebar ---- */
 .sidebar {
   display: flex;

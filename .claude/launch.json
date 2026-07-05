@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "event-music",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["server.js"],
+      "port": 45416
+    }
+  ]
+}

@@ -101,3 +101,34 @@ export async function checkPlayable(videoId, { timeoutMs = 5000 } = {}) {
     clearTimeout(timer);
   }
 }
+
+// Fetch richer metadata from the watch page for moderation context:
+// category (Music vs not), YouTube's own isFamilySafe flag, and the description.
+// Returns null on any failure — callers must treat it as best-effort.
+export async function fetchVideoDetails(videoId, { timeoutMs = 5000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch("https://www.youtube.com/watch?v=" + videoId, {
+      headers: COMMON_HEADERS,
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const m = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script>)/s);
+    if (!m) return null;
+    const data = JSON.parse(m[1]);
+    const vd = data.videoDetails || {};
+    const mf = data.microformat?.playerMicroformatRenderer || {};
+    return {
+      author: vd.author || "",
+      category: mf.category || "",
+      isFamilySafe: mf.isFamilySafe,
+      description: (vd.shortDescription || "").slice(0, 500),
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}

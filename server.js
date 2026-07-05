@@ -16,8 +16,8 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import QRCode from "qrcode";
 
-import { searchYouTube, checkPlayable } from "./src/youtube.js";
-import { moderate } from "./src/gemini.js";
+import { searchYouTube, checkPlayable, fetchVideoDetails } from "./src/youtube.js";
+import { moderate, moderationConfigured } from "./src/moderation.js";
 import { JukeboxState } from "./src/state.js";
 import { detectLanIp } from "./src/net.js";
 
@@ -40,10 +40,10 @@ const LAN_IP = detectLanIp(process.env.HOST_IP);
 // app runs behind a reverse proxy. Otherwise fall back to LAN IP + port.
 const PUBLIC_BASE = (process.env.PUBLIC_URL || "").replace(/\/+$/, "");
 const GUEST_URL = PUBLIC_BASE ? `${PUBLIC_BASE}/guest` : `http://${LAN_IP}:${PORT}/guest`;
-// Moderation is opt-in: only runs when explicitly enabled AND a key is present.
-const MODERATION_ON =
-  String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true" &&
-  !!process.env.GEMINI_API_KEY;
+// Filter (LLM moderation) is runtime-toggleable from the host page. Its initial
+// state comes from ENABLE_MODERATION in .env (default off). When ON but no API
+// key is configured, moderation fails open (accepts everything) — harmless.
+let filterOn = String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true";
 
 const app = express();
 app.use(express.json());
@@ -57,7 +57,7 @@ const state = new JukeboxState();
 app.get("/api/info", async (_req, res) => {
   try {
     const qr = await QRCode.toDataURL(GUEST_URL, { width: 480, margin: 1 });
-    res.json({ guestUrl: GUEST_URL, qr, moderation: MODERATION_ON });
+    res.json({ guestUrl: GUEST_URL, qr, filterOn, moderationConfigured: moderationConfigured() });
   } catch (err) {
     res.status(500).json({ error: String(err?.message || err) });
   }
@@ -88,10 +88,11 @@ app.post("/api/request", async (req, res) => {
     return res.json({ ok: false, reason: playable.reason });
   }
 
-  // 2. Moderation (Gemini) — OFF by default. Set ENABLE_MODERATION=true in .env
-  //    to turn it back on (requires GEMINI_API_KEY). Fails open when enabled.
-  if (MODERATION_ON) {
-    const verdict = await moderate({ title, channel });
+  // 2. Filter (LLM moderation) — only when toggled on. Enriches with the video's
+  //    category / isFamilySafe / description, then asks the LLM. Fails open.
+  if (filterOn) {
+    const details = await fetchVideoDetails(videoId); // best-effort, may be null
+    const verdict = await moderate({ title, channel }, details);
     if (!verdict.approved) {
       return res.json({ ok: false, reason: verdict.reason });
     }
@@ -116,17 +117,20 @@ app.get("/guest", (_req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-function broadcast(snapshot) {
-  const msg = JSON.stringify({ type: "state", state: snapshot });
+function stateMessage() {
+  return JSON.stringify({ type: "state", state: state.snapshot(), filterOn });
+}
+function broadcastState() {
+  const msg = stateMessage();
   for (const client of wss.clients) {
     if (client.readyState === 1) client.send(msg);
   }
 }
-state.onChange = broadcast;
+state.onChange = broadcastState;
 
 wss.on("connection", (ws) => {
   // Send current state immediately on connect.
-  ws.send(JSON.stringify({ type: "state", state: state.snapshot() }));
+  ws.send(stateMessage());
 
   ws.on("message", (raw) => {
     let msg;
@@ -152,6 +156,11 @@ wss.on("connection", (ws) => {
       case "move":
         state.move(msg.id, msg.dir);
         break;
+      case "setFilter": // host toggled the content filter on/off
+        filterOn = !!msg.on;
+        console.log(`[host] filter turned ${filterOn ? "ON" : "OFF"}`);
+        broadcastState();
+        break;
     }
   });
 });
@@ -161,7 +170,8 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`  Projector (host) : http://localhost:${PORT}/`);
   console.log(`  Guests scan QR   : ${GUEST_URL}`);
   console.log(
-    `  Moderation       : ${MODERATION_ON ? "Gemini ON" : "OFF (accepting all songs)"}\n`
+    `  Filter           : ${filterOn ? "ON" : "OFF"} (toggle from host page) · ` +
+      `LLM ${moderationConfigured() ? "configured" : "NOT configured — filter accepts all"}\n`
   );
   if (LAN_IP === "127.0.0.1") {
     console.warn("  ⚠  Could not detect a LAN IP — guests on other devices won't reach you.\n");
