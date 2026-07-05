@@ -107,6 +107,11 @@ app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "host.html"));
 });
 
+// Guest page — the QR code points here (extensionless, so static won't serve it).
+app.get("/guest", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "guest.html"));
+});
+
 // --- WebSocket: real-time queue sync + host controls ---------------------
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
