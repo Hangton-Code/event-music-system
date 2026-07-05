@@ -48,6 +48,7 @@ console.log("Moderation test (title + channel only):");
 for (const song of [
   { title: "BTS (방탄소년단) 'Dynamite' Official MV", channel: "HYBE LABELS" },
   { title: "How to file your taxes 2024 — full tutorial", channel: "TaxTips" },
+  { title: "God Save the King — British National Anthem", channel: "Royal Anthems" },
 ]) {
   const v = await moderate(song);
   console.log(`  ${v.approved ? "✅" : "🚫"}  ${song.title}  →  ${v.reason}`);

@@ -19,6 +19,10 @@ function config(opts = {}) {
     baseUrl: (opts.baseUrl ?? process.env.LLM_BASE_URL ?? "https://api.moonshot.ai/v1").replace(/\/+$/, ""),
     model: opts.model ?? process.env.LLM_MODEL ?? "kimi-k2.6",
     strict: opts.strict ?? (process.env.MODERATION_MODE || "").toLowerCase() === "strict",
+    eventContext:
+      opts.eventContext ??
+      (process.env.EVENT_CONTEXT ||
+        "a secondary school graduation dinner (prom-like party) in Hong Kong"),
     temperature: opts.temperature ?? process.env.LLM_TEMPERATURE, // undefined = use API default
     timeoutMs: opts.timeoutMs ?? 8000,
   };
@@ -28,10 +32,14 @@ export function moderationConfigured() {
   return !!(process.env.LLM_API_KEY);
 }
 
-function buildMessages(song, details, strict) {
+function buildMessages(song, details, { strict, eventContext }) {
   const policy = strict
-    ? "Approve ONLY clearly family-friendly, event-appropriate music. Reject anything explicit, sexual, violent, hateful, or borderline."
-    : "Reject only if it is clearly NOT music (podcast, gameplay, tutorial, talk, news, ASMR, sound effect) OR if it contains explicit/offensive/NSFW content. Otherwise approve.";
+    ? "Approve ONLY clearly family-friendly music that fits this event. Reject anything explicit, sexual, violent, hateful, politically sensitive, or borderline."
+    : "Reject if it is clearly NOT music (podcast, gameplay, tutorial, talk, news, ASMR, sound effect), " +
+      "OR contains explicit/offensive/NSFW content, " +
+      "OR is a poor fit for this event's social setting — e.g. national anthems, political or protest songs, " +
+      "religious/ceremonial music, or anything that could read as a political statement in this context. " +
+      "Otherwise approve; when a song is simply an ordinary pop/party/love song, approve it.";
 
   const ctx = [
     `Title: ${song.title}`,
@@ -47,7 +55,7 @@ function buildMessages(song, details, strict) {
     {
       role: "system",
       content:
-        "You moderate song requests for a live event's public music queue. " +
+        `You moderate song requests for the public music queue at ${eventContext}. ` +
         policy +
         ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
         "The reason is short and shown to the guest who requested the song.",
@@ -77,7 +85,7 @@ export async function moderate(song, details = null, opts = {}) {
   const c = config(opts);
   if (!c.apiKey) return APPROVED;
 
-  const body = { model: c.model, messages: buildMessages(song, details, c.strict) };
+  const body = { model: c.model, messages: buildMessages(song, details, c) };
   if (c.temperature !== undefined) body.temperature = Number(c.temperature);
 
   const controller = new AbortController();
