@@ -23,12 +23,12 @@ jobs:
     steps:
       - name: Pull latest and rebuild
         env:
-          # Optional: set repo variable DEPLOY_DIR (Settings → Actions → Variables)
-          # if your clone isn't at ~/event-music-system.
+          # Deploy directory (the clone on the home server). Override by setting
+          # a repo variable DEPLOY_DIR (Settings → Actions → Variables).
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
         run: |
           set -euo pipefail
-          cd "${DEPLOY_DIR:-$HOME/event-music-system}"
+          cd "${DEPLOY_DIR:-/root/scripts/event-music-system}"
           echo "Deploying in $(pwd)"
           git fetch --all --prune
           git reset --hard origin/main        # untracked .env is preserved
