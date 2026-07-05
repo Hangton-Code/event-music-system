@@ -21,9 +21,11 @@ to the venue's AV system.
 - **Accepts all songs by default** — no gatekeeping. An optional LLM content
   filter (Kimi by default) can be toggled on live from the host page.
 - **Song suggestions** — the guest page shows tappable hits across K-pop,
-  Cantopop, Mandopop, Western, and party genres, reshuffled on demand.
+  Cantopop, Mandopop, Western, party, and HK classics genres, reshuffled on demand.
 - **Playability pre-check** — deleted/private videos are rejected before queuing;
   embed-disabled/region-locked videos are auto-skipped by the player.
+- **Queue guardrails** — duplicate songs, a per-IP request cooldown, and a
+  50-song cap keep one guest (or a flaky connection) from spamming the queue.
 - **Live queue** over WebSocket on both the projector and every phone.
 - **Host controls** — play/pause (`space`), skip (`n`), volume, remove tracks.
 

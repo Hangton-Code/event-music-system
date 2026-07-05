@@ -12,11 +12,16 @@
     <p>Search YouTube and send a track to the party.</p>
   </header>
 
+  <input id="name" class="name-input" type="text" maxlength="40"
+         placeholder="Your name (shown with your song)" autocomplete="off" />
+
   <form id="search-form">
     <input id="q" type="search" placeholder="Search for a song or artist…"
            autocomplete="off" enterkeyhint="search" />
     <button type="submit" id="search-btn">Search</button>
   </form>
+
+  <button id="back-to-explore" class="back-to-explore hidden">← Back to Explore</button>
 
   <section id="suggestions-section">
     <div class="sug-head">

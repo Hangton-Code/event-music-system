@@ -80,7 +80,9 @@ function syncPlayer() {
 function render() {
   const np = latestState.nowPlaying;
   document.getElementById("now-title").textContent = np ? np.title : "—";
-  document.getElementById("now-channel").textContent = np ? np.channel : "";
+  document.getElementById("now-channel").textContent = np
+    ? np.channel + (np.addedBy ? ` · 點唱: ${np.addedBy}` : "")
+    : "";
 
   const queue = latestState.queue || [];
   document.getElementById("queue-count").textContent = queue.length;

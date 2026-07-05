@@ -46,6 +46,7 @@ const GUEST_URL = PUBLIC_BASE ? `${PUBLIC_BASE}/guest` : `http://${LAN_IP}:${POR
 let filterOn = String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true";
 
 const app = express();
+app.set("trust proxy", true); // behind a reverse proxy — req.ip should read X-Forwarded-For
 app.use(express.json());
 app.use(
   express.static(path.join(__dirname, "public"), {
@@ -101,6 +102,23 @@ app.get("/api/browse", async (req, res) => {
   }
 });
 
+// Flood control: one request per REQUEST_COOLDOWN_MS per guest. Keyed on
+// IP + the guest page's persistent clientId — at an event most guests sit
+// behind the venue Wi-Fi's single NAT'd IP, so IP alone would give the whole
+// party one shared cooldown. (clientId is client-chosen, so a determined
+// prankster can rotate it — the host's remove button is the backstop.)
+const REQUEST_COOLDOWN_MS = 15 * 1000;
+const lastRequestAt = new Map(); // "ip|clientId" -> timestamp of last attempt
+function pruneLastRequestAt() {
+  if (lastRequestAt.size <= 500) return;
+  const cutoff = Date.now() - REQUEST_COOLDOWN_MS;
+  for (const [key, at] of lastRequestAt) {
+    if (at < cutoff) lastRequestAt.delete(key);
+  }
+}
+
+const MAX_QUEUE_LENGTH = 50;
+
 app.get("/api/search", async (req, res) => {
   const q = (req.query.q || "").toString().trim();
   if (!q) return res.json({ results: [] });
@@ -115,10 +133,31 @@ app.get("/api/search", async (req, res) => {
 
 // Guest requests a song.
 app.post("/api/request", async (req, res) => {
-  const { videoId, title, channel, duration, thumbnail, name } = req.body || {};
+  const { videoId, title, channel, duration, thumbnail, name, clientId } = req.body || {};
+  const floodKey = `${req.ip}|${(clientId || "").toString().slice(0, 64)}`;
+  const last = lastRequestAt.get(floodKey);
+  if (last && Date.now() - last < REQUEST_COOLDOWN_MS) {
+    return res.json({ ok: false, reason: "Slow down — try again in a few seconds." });
+  }
+
   if (!videoId || !title) {
     return res.status(400).json({ ok: false, reason: "Missing song info." });
   }
+
+  if (state.queue.length >= MAX_QUEUE_LENGTH) {
+    return res.json({ ok: false, reason: "Queue is full — try again once it drains a bit." });
+  }
+
+  // Reject re-adding a song that's already playing or queued.
+  if (state.has(videoId)) {
+    return res.json({ ok: false, reason: "That song is already in the queue!" });
+  }
+
+  // Start the cooldown only now: the checks above are free and shouldn't lock
+  // a guest out (e.g. after tapping a duplicate), but everything below hits
+  // YouTube and possibly the LLM — that's what the cooldown protects.
+  lastRequestAt.set(floodKey, Date.now());
+  pruneLastRequestAt();
 
   // 1. Is the video actually playable?
   const playable = await checkPlayable(videoId);
@@ -137,8 +176,8 @@ app.post("/api/request", async (req, res) => {
   }
 
   // 3. Enqueue.
-  const { position } = state.add({ videoId, title, channel, duration, thumbnail, addedBy: name });
-  res.json({ ok: true, reason: "Added!", position });
+  const { item, position } = state.add({ videoId, title, channel, duration, thumbnail, addedBy: name });
+  res.json({ ok: true, reason: "Added!", position, id: item.id });
 });
 
 // Host page lives at "/".

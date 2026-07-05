@@ -27,6 +27,19 @@ header { text-align: center; margin-bottom: 1.2rem; }
 header h1 { font-size: 1.8rem; }
 header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
 
+.name-input {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.6rem;
+  border-radius: 10px;
+  border: 1px solid #ffffff20;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.name-input:focus { outline: 2px solid var(--accent-2); }
+
 #search-form { display: flex; gap: 0.5rem; position: sticky; top: 0; padding: 0.4rem 0; background: var(--bg); z-index: 5; }
 #q {
   flex: 1;
@@ -49,6 +62,18 @@ header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
 }
 
 .status { text-align: center; color: var(--muted); padding: 1rem; }
+
+.back-to-explore {
+  display: block;
+  width: 100%;
+  margin: 0.6rem 0;
+  padding: 0.6rem;
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+}
 
 /* Suggestions — KTV-style genre tabs + colorful tiles */
 #suggestions-section { margin: 1rem 0 0.5rem; }
@@ -147,6 +172,7 @@ header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
 .g-mando { background: linear-gradient(135deg, #f59e0b, #ef4444); }
 .g-western { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
 .g-party { background: linear-gradient(135deg, #8b5cf6, #3b82f6); }
+.g-classics { background: linear-gradient(135deg, #64748b, #334155); }
 
 #results, #queue { list-style: none; }
 
@@ -185,11 +211,21 @@ header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.3rem; }
 }
 .now-playing .np-label { font-size: 0.75rem; color: var(--accent); letter-spacing: 0.05em; }
 .now-playing .np-title { font-weight: 600; }
-#queue li { padding: 0.5rem 0; border-bottom: 1px solid #ffffff10; display: flex; gap: 0.4rem; }
+#queue li { padding: 0.5rem 0; border-bottom: 1px solid #ffffff10; display: flex; gap: 0.4rem; align-items: center; }
 .q-num { color: var(--muted); width: 1.4rem; flex-shrink: 0; }
-.q-text { min-width: 0; }
+.q-text { min-width: 0; flex: 1; }
 .q-text .t { font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .q-text .s { font-size: 0.78rem; color: var(--muted); }
+.q-you {
+  flex-shrink: 0;
+  background: var(--accent-2);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+}
 .q-empty { color: var(--muted); padding: 0.6rem 0; }
 
 /* Toast */

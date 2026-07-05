@@ -15,6 +15,11 @@ export class JukeboxState {
     this.onChange = () => {};
   }
 
+  // Is this video already playing or somewhere in the queue?
+  has(videoId) {
+    return this.nowPlaying?.videoId === videoId || this.queue.some((s) => s.videoId === videoId);
+  }
+
   snapshot() {
     return {
       nowPlaying: this.nowPlaying,
