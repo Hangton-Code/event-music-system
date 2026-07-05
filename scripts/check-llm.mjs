@@ -49,6 +49,9 @@ for (const song of [
   { title: "BTS (방탄소년단) 'Dynamite' Official MV", channel: "HYBE LABELS" },
   { title: "How to file your taxes 2024 — full tutorial", channel: "TaxTips" },
   { title: "God Save the King — British National Anthem", channel: "Royal Anthems" },
+  // Chinese-hosted models refuse this topic outright (finish_reason
+  // content_filter) — must come back 🚫 via the fail-closed branch.
+  { title: "香港國歌《願榮光歸香港》管弦樂團及合唱團版 Hong Kong National Anthem", channel: "Malechan Chen" },
 ]) {
   const v = await moderate(song);
   console.log(`  ${v.approved ? "✅" : "🚫"}  ${song.title}  →  ${v.reason}`);

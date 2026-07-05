@@ -103,7 +103,16 @@ export async function moderate(song, details = null, opts = {}) {
       return APPROVED;
     }
     const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content || "";
+    const choice = data?.choices?.[0];
+    const text = choice?.message?.content || "";
+    // If the provider's own safety layer censored the reply (finish_reason
+    // "content_filter"), the topic itself is too sensitive for the model to
+    // discuss — e.g. banned protest songs with Chinese-hosted models. That is
+    // a REJECT, not a hiccup: fail closed here, unlike network errors.
+    if (choice?.finish_reason === "content_filter") {
+      console.warn(`[moderation] provider content_filter — rejecting. ${text.slice(0, 150)}`);
+      return { approved: false, reason: "Not a good fit for this event.", moderated: true };
+    }
     const parsed = extractJson(text);
     if (!parsed || typeof parsed.approved !== "boolean") {
       console.warn(`[moderation] unparseable reply — failing open. ${text.slice(0, 150)}`);
