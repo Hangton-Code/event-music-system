@@ -19,10 +19,21 @@ function sendAuth() {
   if (hostToken && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "auth", token: hostToken }));
 }
 
+// If the track finished while the WS was down, the "ended" message was lost
+// and the server still thinks it's playing — resync on reconnect.
+function reportIfEnded() {
+  if (playerReady && currentVideoId && player.getPlayerState && player.getPlayerState() === YT.PlayerState.ENDED) {
+    send({ type: "ended", videoId: currentVideoId });
+  }
+}
+
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}`);
-  ws.onopen = sendAuth; // re-auth on every (re)connect
+  ws.onopen = () => {
+    sendAuth(); // re-auth on every (re)connect
+    reportIfEnded();
+  };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "state") {
@@ -87,7 +98,25 @@ function syncPlayer() {
     currentVideoId = np.videoId;
     player.loadVideoById(np.videoId);
     player.playVideo();
+    armPlaybackWatchdog(np.videoId);
   }
+}
+
+// Some broken embeds render a black frame without ever firing onError. If a
+// freshly loaded video hasn't produced any playback after 20s (and isn't
+// simply paused), report it as an error so the server skips to the next song.
+let playbackWatchdog = null;
+function armPlaybackWatchdog(videoId) {
+  clearTimeout(playbackWatchdog);
+  playbackWatchdog = setTimeout(() => {
+    if (currentVideoId !== videoId || !playerReady) return;
+    const t = player.getCurrentTime ? player.getCurrentTime() : 0;
+    const s = player.getPlayerState ? player.getPlayerState() : -1;
+    if (t < 1 && s !== YT.PlayerState.PLAYING && s !== YT.PlayerState.PAUSED) {
+      console.warn(`[watchdog] ${videoId} never started (state ${s}) — skipping`);
+      send({ type: "error", videoId, code: "watchdog" });
+    }
+  }, 20000);
 }
 
 // ---- Rendering --------------------------------------------------------

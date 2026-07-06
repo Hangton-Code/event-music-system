@@ -37,12 +37,16 @@ export function moderationConfigured() {
 
 function buildMessages(song, details, { strict, eventContext }) {
   const policy = strict
-    ? "Approve ONLY clearly family-friendly music that fits this event. Reject anything explicit, sexual, violent, hateful, politically sensitive, or borderline."
-    : "Reject if it is clearly NOT music (podcast, gameplay, tutorial, talk, news, ASMR, sound effect), " +
-      "OR contains explicit/offensive/NSFW content, " +
-      "OR is a poor fit for this event's social setting — e.g. national anthems, political or protest songs, " +
-      "religious/ceremonial music, or anything that could read as a political statement in this context. " +
-      "Otherwise approve; when a song is simply an ordinary pop/party/love song, approve it.";
+    ? "STRICT mode: approve ONLY clearly family-friendly music, regardless of the venue. Reject anything explicit, sexual, violent, hateful, politically sensitive, or borderline."
+    : "Let the NATURE OF THIS EVENT set the bar — what fits a nightclub differs from a school dinner. " +
+      "Reject only what a reasonable host of THIS event would veto: " +
+      "clearly not music (podcast, gameplay, tutorial, talk, news, ASMR, sound effect), " +
+      "or content genuinely inappropriate for this event's audience and setting — e.g. national anthems, " +
+      "political/protest songs, or religious/ceremonial music at an ordinary social event; sexually explicit " +
+      "tracks at a school or family event. " +
+      "At adult venues (nightclubs, bars, adult parties), mainstream music with explicit lyrics or suggestive " +
+      "themes IS acceptable — YouTube's isFamilySafe=false is NOT by itself a reason to reject. " +
+      "When in doubt about an ordinary pop/party/love song, approve.";
 
   const ctx = [
     `Title: ${song.title}`,
