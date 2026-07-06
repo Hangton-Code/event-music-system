@@ -358,13 +358,22 @@ header p { font: 400 13.5px/1.6 var(--sans); color: var(--muted); margin-top: 10
 }
 .q-empty { color: var(--muted); padding: 0.6rem 0; font: 400 13.5px/1.5 var(--sans); }
 
-/* ---- Toast ---- */
-.toast {
+/* ---- Toasts ---- */
+.toasts {
   position: fixed;
   left: 50%;
   bottom: 1.5rem;
-  transform: translateX(-50%) translateY(2rem);
+  transform: translateX(-50%);
   width: min(90%, 400px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none; /* feedback only — never blocks taps on content below */
+}
+.toast {
+  position: relative;
+  overflow: hidden; /* clips the checking scan bar to the rounded corners */
   display: flex;
   align-items: center;
   gap: 12px;
@@ -374,10 +383,10 @@ header p { font: 400 13.5px/1.6 var(--sans); color: var(--muted); margin-top: 10
   border: 1px solid var(--line);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
   opacity: 0;
+  transform: translateY(2rem);
   transition: all 0.25s ease;
-  z-index: 20;
 }
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.show { opacity: 1; transform: none; }
 .toast-ico {
   width: 30px;
   height: 30px;
@@ -399,3 +408,27 @@ header p { font: 400 13.5px/1.6 var(--sans); color: var(--muted); margin-top: 10
 .toast.bad .toast-ico { background: oklch(68% 0.18 32 / 0.2); }
 .toast.info { border-color: oklch(80% 0.14 85 / 0.4); }
 .toast.info .toast-ico { background: oklch(80% 0.14 85 / 0.15); }
+
+/* While the filter checks a song (can take 5–20s with web search): sweep a
+   light along the bottom edge and pulse the icon so the wait reads as live
+   activity, not a frozen card. */
+.toast.checking::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, oklch(80% 0.14 85), transparent);
+  animation: toast-scan 1.4s ease-in-out infinite;
+}
+@keyframes toast-scan {
+  from { transform: translateX(-100%); } /* own width off-screen left */
+  to { transform: translateX(250%); }    /* 250% of 40% = clear of the right edge */
+}
+.toast.checking .toast-ico { animation: toast-pulse 1.4s ease-in-out infinite; }
+@keyframes toast-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}

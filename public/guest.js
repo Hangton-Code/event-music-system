@@ -2,7 +2,7 @@
 
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
-const toastEl = document.getElementById("toast");
+const toastsEl = document.getElementById("toasts");
 const qEl = document.getElementById("q");
 const nameEl = document.getElementById("name");
 const sugSection = document.getElementById("suggestions-section");
@@ -295,7 +295,9 @@ function rememberMyRequest(id) {
 async function requestSong(song, btn) {
   btn.disabled = true;
   btn.textContent = "…";
-  toast("info", "🔎", "檢查歌曲中…", true, "Checking song…"); // persistent until we get a verdict
+  // Persistent, animated "checking" card — with the web-searching filter a
+  // verdict can take 5–20s, so it must read as activity, not a frozen toast.
+  const t = toast("info", "🔎", "檢查歌曲中…", { persist: true, sub: "Checking song…", checking: true });
   try {
     const res = await fetch("/api/request", {
       method: "POST",
@@ -306,7 +308,7 @@ async function requestSong(song, btn) {
     if (data.ok) {
       const main = data.position === 0 ? "已加入 · 現正播放" : `已加入 · 排第 ${data.position} 首`;
       const sub = data.position === 0 ? "Added — playing now!" : `Added — #${data.position} in the queue!`;
-      toast("ok", "✓", main, false, sub);
+      t.set("ok", "✓", main, { sub });
       btn.textContent = "✓";
       if (data.id) {
         rememberMyRequest(data.id);
@@ -315,56 +317,77 @@ async function requestSong(song, btn) {
         if (lastQueueState) renderQueue(lastQueueState);
       }
     } else {
-      if (data.retryIn) cooldownToast(data.retryIn);
-      else toast("bad", "🚫", data.reason || "Couldn't add that song.");
+      if (data.retryIn) {
+        t.dismiss();
+        cooldownToast(data.retryIn);
+      } else t.set("bad", "🚫", data.reason || "Couldn't add that song.");
       btn.disabled = false;
       btn.textContent = "+";
     }
   } catch (err) {
-    toast("bad", "⚠️", "網絡錯誤，請再試。", false, "Network error. Try again.");
+    t.set("bad", "⚠️", "網絡錯誤，請再試。", { sub: "Network error. Try again." });
     btn.disabled = false;
     btn.textContent = "+";
   }
 }
 
-// Toast card: icon circle + Chinese main line + smaller English subline.
-function toastMarkup(icon, main, sub) {
-  toastEl.innerHTML = `
-    <span class="toast-ico"></span>
-    <div><div class="toast-main"></div><div class="toast-sub"></div></div>`;
-  toastEl.querySelector(".toast-ico").textContent = icon;
-  toastEl.querySelector(".toast-main").textContent = main;
-  const subEl = toastEl.querySelector(".toast-sub");
-  if (sub) subEl.textContent = sub;
-  else subEl.remove();
-}
+// Stacking toasts: each card is its own element (icon circle + Chinese main
+// line + smaller English subline). toast() returns a handle whose set() morphs
+// the card in place — a request's "checking…" card becomes its own verdict —
+// so parallel requests never clobber each other's feedback.
+const MAX_TOASTS = 3;
 
-function toast(kind, icon, main, persist = false, sub = "") {
-  clearInterval(cooldownToast._i); // a new toast supersedes a running countdown
-  toastEl.className = `toast show ${kind}`;
-  toastMarkup(icon, main, sub);
-  clearTimeout(toast._t);
-  if (!persist) toast._t = setTimeout(() => (toastEl.className = "toast"), 3800);
+function toast(kind, icon, main, opts = {}) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  toastsEl.appendChild(el);
+  while (toastsEl.children.length > MAX_TOASTS) toastsEl.firstElementChild.remove();
+  void el.offsetHeight; // flush styles so adding .show below animates the entry
+  let timer;
+  const h = {
+    el,
+    set(kind2, icon2, main2, { persist = false, sub = "", checking = false } = {}) {
+      el.className = `toast show ${kind2}${checking ? " checking" : ""}`;
+      el.innerHTML = `
+        <span class="toast-ico"></span>
+        <div><div class="toast-main"></div><div class="toast-sub"></div></div>`;
+      el.querySelector(".toast-ico").textContent = icon2;
+      el.querySelector(".toast-main").textContent = main2;
+      const subEl = el.querySelector(".toast-sub");
+      if (sub) subEl.textContent = sub;
+      else subEl.remove();
+      clearTimeout(timer);
+      if (!persist) timer = setTimeout(h.dismiss, 3800);
+    },
+    dismiss() {
+      clearTimeout(timer);
+      el.classList.remove("show");
+      setTimeout(() => el.remove(), 300); // let the exit transition play
+    },
+  };
+  h.set(kind, icon, main, opts);
+  return h;
 }
 
 // Live countdown shown when the server rejects a request for coming too soon
-// (retryIn = seconds left). Writes toastEl directly so its own ticks don't
-// cancel themselves via toast().
+// (retryIn = seconds left). Singleton card: retrying mid-cooldown restarts the
+// countdown on the same card instead of stacking duplicates.
 function cooldownToast(seconds) {
   clearInterval(cooldownToast._i);
-  clearTimeout(toast._t);
+  if (!cooldownToast._h?.el.isConnected) {
+    cooldownToast._h = toast("bad", "⏳", "", { persist: true });
+  }
+  const t = cooldownToast._h;
   let left = seconds;
-  const show = () => {
-    toastEl.className = "toast show bad";
-    toastMarkup("⏳", `再等 ${left} 秒`, `Next song in ${left}s…`);
-  };
-  show();
+  const draw = () =>
+    t.set("bad", "⏳", `再等 ${left} 秒`, { persist: true, sub: `Next song in ${left}s…` });
+  draw();
   cooldownToast._i = setInterval(() => {
     left--;
     if (left <= 0) {
       clearInterval(cooldownToast._i);
-      toastEl.className = "toast";
-    } else show();
+      t.dismiss();
+    } else draw();
   }, 1000);
 }
 
