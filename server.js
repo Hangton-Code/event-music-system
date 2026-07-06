@@ -4,9 +4,10 @@
 //   /guest   -> guest page (phones open this via the QR code)
 //
 // Flow when a guest requests a song:
-//   1. checkPlayable()  — reject deleted/private/nonexistent videos
-//   2. moderate()       — Gemini approves/rejects on title+channel (fail-open)
-//   3. state.add()      — enqueue; broadcast to all clients over WebSocket
+//   1. guardrails       — cooldown, duplicate, queue cap
+//   2. checkPlayable()  — reject deleted/private/nonexistent videos
+//   3. moderate()       — optional LLM verdict for this event (fail-open)
+//   4. state.add()      — enqueue; broadcast to all clients over WebSocket
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
