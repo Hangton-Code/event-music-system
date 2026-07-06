@@ -55,6 +55,11 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
       "When in doubt about an ordinary pop/party/love song, approve.";
 
   const ctx = [
+    // The web plugin derives its search query from this message (there is no
+    // explicit query field), so when search is on, lead with a lyrics-shaped
+    // line to steer it at lyrics pages instead of reviews/video pages.
+    // "歌詞" covers Chinese lyrics sites for Cantopop/Mandopop requests.
+    webSearch ? `Find this song's lyrics: ${song.title} lyrics 歌詞` : null,
     `Title: ${song.title}`,
     `Channel: ${song.channel || details?.author || "unknown"}`,
     details?.category ? `YouTube category: ${details.category}` : null,
@@ -129,6 +134,14 @@ export async function moderate(song, details = null, opts = {}) {
     const data = await res.json();
     const choice = data?.choices?.[0];
     const text = choice?.message?.content || "";
+    // Web plugin citations — logged so the server logs show which pages
+    // (ideally lyrics sites) each verdict was actually based on.
+    const sources = (choice?.message?.annotations || [])
+      .map((a) => a?.url_citation?.url)
+      .filter(Boolean);
+    if (sources.length) {
+      console.log(`[moderation] "${song.title}" web sources: ${sources.slice(0, 5).join(" ")}`);
+    }
     // If the provider's own safety layer censored the reply (finish_reason
     // "content_filter"), the topic itself is too sensitive for the model to
     // discuss — e.g. banned protest songs with Chinese-hosted models. That is
