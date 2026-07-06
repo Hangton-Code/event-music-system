@@ -136,8 +136,10 @@ Failure design worth knowing:
   content-filter, no structured verdict) — evasion is treated as a rejection.
 
 > The filter reads title, channel, category, and description — not the audio.
-> It catches non-music and explicit metadata, not explicit lyrics hidden under
-> a clean title.
+> By default it catches non-music and explicit metadata, not explicit lyrics
+> hidden under a clean title. On OpenRouter, set `LLM_WEB_SEARCH=true` to close
+> that gap: the model web-searches each song and judges the actual lyrics
+> (~$0.005 per moderated request, a few seconds slower).
 
 ## Run on a home server (Docker + reverse proxy)
 

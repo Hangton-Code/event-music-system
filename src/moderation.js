@@ -15,6 +15,11 @@
 //  - FAIL-CLOSED when the model answers but gives no verdict: provider
 //    content_filter censorship or a reply without valid {"approved": ...}
 //    JSON both mean the model dodged the question — reject the song.
+//  - LLM_WEB_SEARCH=true (OpenRouter only) attaches OpenRouter's web plugin so
+//    the model sees live search results — usually the song's actual lyrics —
+//    instead of judging by title alone. Costs ~$0.005 per moderated request
+//    (Exa search) on top of tokens; other providers reject the extra field,
+//    hence opt-in.
 
 function config(opts = {}) {
   return {
@@ -27,7 +32,8 @@ function config(opts = {}) {
       (process.env.EVENT_CONTEXT ||
         "a secondary school graduation dinner (prom-like party) in Hong Kong"),
     temperature: opts.temperature ?? process.env.LLM_TEMPERATURE, // undefined = use API default
-    timeoutMs: opts.timeoutMs ?? 8000,
+    webSearch: opts.webSearch ?? (process.env.LLM_WEB_SEARCH || "").toLowerCase() === "true",
+    timeoutMs: opts.timeoutMs, // resolved below — web search needs more headroom
   };
 }
 
@@ -35,7 +41,7 @@ export function moderationConfigured() {
   return !!(process.env.LLM_API_KEY);
 }
 
-function buildMessages(song, details, { strict, eventContext }) {
+function buildMessages(song, details, { strict, eventContext, webSearch }) {
   const policy = strict
     ? "STRICT mode: approve ONLY clearly family-friendly music, regardless of the venue. Reject anything explicit, sexual, violent, hateful, politically sensitive, or borderline."
     : "Let the NATURE OF THIS EVENT set the bar — what fits a nightclub differs from a school dinner. " +
@@ -64,6 +70,11 @@ function buildMessages(song, details, { strict, eventContext }) {
       content:
         `You moderate song requests for the public music queue at ${eventContext}. ` +
         policy +
+        (webSearch
+          ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
+            " lyrical content and meaning, not just the title. A clean-sounding title with" +
+            " inappropriate lyrics is a reject; ignore results that are about a different song."
+          : "") +
         ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
         "The reason is short and shown to the guest who requested the song.",
     },
@@ -94,9 +105,15 @@ export async function moderate(song, details = null, opts = {}) {
 
   const body = { model: c.model, messages: buildMessages(song, details, c) };
   if (c.temperature !== undefined) body.temperature = Number(c.temperature);
+  // OpenRouter web plugin: searches the web for the song (the user message is
+  // the query source) and injects the results — typically its lyrics page —
+  // before the model answers. https://openrouter.ai/docs/guides/features/plugins/web-search
+  if (c.webSearch) body.plugins = [{ id: "web", max_results: 5 }];
 
+  // The search round-trip needs extra headroom before we give up and fail open.
+  const timeoutMs = c.timeoutMs ?? (c.webSearch ? 20000 : 8000);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), c.timeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${c.baseUrl}/chat/completions`, {
       method: "POST",

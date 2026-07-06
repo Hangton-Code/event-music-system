@@ -34,7 +34,7 @@ There is no lint, build, or test step. Verify changes by running the server and 
 - **Fail-open** (approve) for infrastructure failures only: missing API key, HTTP error, timeout. A moderation outage must never stop the music.
 - **Fail-closed** (reject) when the model answers but dodges: provider `content_filter` finish reason, or a reply without valid `{"approved": boolean}` JSON. This catches e.g. banned protest songs that Chinese-hosted models refuse to discuss.
 
-The LLM is any OpenAI-compatible chat API, configured entirely via `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` — no provider-specific code. Don't rely on `response_format: json_object` (support varies) and don't set `temperature` unless `LLM_TEMPERATURE` is explicit (some models reject arbitrary values). The prompt includes `EVENT_CONTEXT` so the model judges fit for the occasion, not just explicitness.
+The LLM is any OpenAI-compatible chat API, configured entirely via `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` — no provider-specific code, with one opt-in exception: `LLM_WEB_SEARCH=true` attaches OpenRouter's web plugin (`plugins: [{id: "web"}]`) so the model sees live search results (usually the song's lyrics) instead of judging by title alone. Other providers reject the extra field, so it must stay opt-in. Don't rely on `response_format: json_object` (support varies) and don't set `temperature` unless `LLM_TEMPERATURE` is explicit (some models reject arbitrary values). The prompt includes `EVENT_CONTEXT` so the model judges fit for the occasion, not just explicitness.
 
 **No dotenv dependency** — `server.js` has its own minimal `.env` loader. Dependencies are just express, ws, qrcode; keep it that way unless there's a strong reason.
 
