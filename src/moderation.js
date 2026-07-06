@@ -76,10 +76,12 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
         `You moderate song requests for the public music queue at ${eventContext}. ` +
         policy +
         " If the title marks the video as a clean/censored edit ('clean', 'clean version'," +
-        " 'radio edit'), judge THAT edit: profanity in the original lyrics is bleeped out of it" +
-        " and is not by itself a reason to reject — clean edits of popular songs are usually" +
-        " fine. Still reject if the song's actual subject matter would be unfit for this event" +
-        " even with the words censored." +
+        " 'radio edit'), judge THAT edit, not the original: profanity and slurs are bleeped" +
+        " out of it. Default to APPROVE clean edits of mainstream songs — even in strict mode" +
+        " they count as family-friendly, and adult themes, innuendo or materialism that survive" +
+        " the censoring are acceptable; hosts routinely play clean edits at school events." +
+        " Reject a clean edit only when the song remains unmistakably unfit, i.e. its core" +
+        " subject is still graphic sex or violence." +
         (webSearch
           ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
             " lyrical content and meaning, not just the title. A clean-sounding title with" +
