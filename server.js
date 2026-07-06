@@ -9,6 +9,7 @@
 //   3. state.add()      — enqueue; broadcast to all clients over WebSocket
 
 import { readFileSync, existsSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import http from "node:http";
@@ -44,10 +45,30 @@ const GUEST_URL = PUBLIC_BASE ? `${PUBLIC_BASE}/guest` : `http://${LAN_IP}:${POR
 // state comes from ENABLE_MODERATION in .env (default off). When ON but no API
 // key is configured, moderation fails open (accepts everything) — harmless.
 let filterOn = String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true";
+// Event context for the moderation LLM ("what kind of event is this?").
+// Starts from .env, editable live from the host page — one deployment serves
+// different venues. Empty = moderation.js's built-in default.
+let eventContext = process.env.EVENT_CONTEXT || "";
 
 const app = express();
 app.set("trust proxy", true); // behind a reverse proxy — req.ip should read X-Forwarded-For
 app.use(express.json());
+
+// --- Host authentication (optional) ---------------------------------------
+// HOST_PASSWORD in .env gates the projector page (Basic Auth) and its controls
+// (a per-boot token the host page carries onto its WebSocket). Guests never
+// need it. Unset = open host page, for trusted-LAN setups.
+const HOST_PASSWORD = process.env.HOST_PASSWORD || "";
+const hostToken = randomUUID();
+function requireHostAuth(req, res, next) {
+  if (!HOST_PASSWORD) return next();
+  const b64 = (req.headers.authorization || "").split(" ")[1] || "";
+  const pass = Buffer.from(b64, "base64").toString().split(":").slice(1).join(":");
+  if (pass === HOST_PASSWORD) return next();
+  res.set("WWW-Authenticate", 'Basic realm="Event Music Host"').status(401).send("Password required.");
+}
+app.use("/host.html", requireHostAuth); // the static copy must not bypass "/"
+
 app.use(
   express.static(path.join(__dirname, "public"), {
     // Force revalidation on every load (cheap 304s via ETag). Without this,
@@ -132,6 +153,12 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
+// Host page bootstrap, part 2: the WS control token (Basic-Auth-gated, so
+// only an authenticated host page can obtain it).
+app.get("/api/host-token", requireHostAuth, (_req, res) => {
+  res.json({ token: HOST_PASSWORD ? hostToken : "" });
+});
+
 // Guest requests a song.
 app.post("/api/request", async (req, res) => {
   const { videoId, title, channel, duration, thumbnail, name, clientId } = req.body || {};
@@ -175,7 +202,7 @@ app.post("/api/request", async (req, res) => {
   //    category / isFamilySafe / description, then asks the LLM. Fails open.
   if (filterOn) {
     const details = await fetchVideoDetails(videoId); // best-effort, may be null
-    const verdict = await moderate({ title, channel }, details);
+    const verdict = await moderate({ title, channel }, details, eventContext ? { eventContext } : {});
     if (!verdict.approved) {
       return res.json({ ok: false, reason: verdict.reason });
     }
@@ -200,7 +227,7 @@ const HOST_PAGE = versionedPage("host.html");
 const GUEST_PAGE = versionedPage("guest.html");
 
 // Host page lives at "/".
-app.get("/", (_req, res) => {
+app.get("/", requireHostAuth, (_req, res) => {
   res.set("Cache-Control", "no-cache").type("html").send(HOST_PAGE);
 });
 
@@ -214,7 +241,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 function stateMessage() {
-  return JSON.stringify({ type: "state", state: state.snapshot(), filterOn, cooldownSeconds });
+  return JSON.stringify({ type: "state", state: state.snapshot(), filterOn, cooldownSeconds, eventContext });
 }
 function broadcastState() {
   const msg = stateMessage();
@@ -225,6 +252,10 @@ function broadcastState() {
 state.onChange = broadcastState;
 
 wss.on("connection", (ws) => {
+  // Without a password every socket may control (trusted-LAN setups);
+  // with one, only sockets that authenticate with the host token may.
+  ws.isHost = !HOST_PASSWORD;
+
   // Send current state immediately on connect.
   ws.send(stateMessage());
 
@@ -235,6 +266,11 @@ wss.on("connection", (ws) => {
     } catch {
       return;
     }
+    if (msg.type === "auth") {
+      if (!HOST_PASSWORD || msg.token === hostToken) ws.isHost = true;
+      return;
+    }
+    if (!ws.isHost) return; // every other message type is a host control
     switch (msg.type) {
       case "ended": // host player finished a track
       case "error": // host player couldn't play (embed-disabled/region-locked)
@@ -267,6 +303,11 @@ wss.on("connection", (ws) => {
         }
         break;
       }
+      case "setEventContext": // host described the venue/occasion for the filter
+        eventContext = (msg.context || "").toString().slice(0, 300);
+        console.log(`[host] event context set to: ${eventContext || "(default)"}`);
+        broadcastState();
+        break;
     }
   });
 });
@@ -277,7 +318,10 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`  Guests scan QR   : ${GUEST_URL}`);
   console.log(
     `  Filter           : ${filterOn ? "ON" : "OFF"} (toggle from host page) · ` +
-      `LLM ${moderationConfigured() ? "configured" : "NOT configured — filter accepts all"}\n`
+      `LLM ${moderationConfigured() ? "configured" : "NOT configured — filter accepts all"}`
+  );
+  console.log(
+    `  Host password    : ${HOST_PASSWORD ? "SET — host page requires login" : "NOT SET — host page is open to anyone"}\n`
   );
   if (LAN_IP === "127.0.0.1") {
     console.warn("  ⚠  Could not detect a LAN IP — guests on other devices won't reach you.\n");

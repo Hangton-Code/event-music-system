@@ -9,21 +9,30 @@ let latestState = { nowPlaying: null, queue: [] };
 let filterOn = false;
 let moderationConfigured = false;
 let cooldownSeconds = 15;
+let eventContext = "";
+let hostToken = null; // WS control token (only issued to the authenticated host page)
 let ws = null;
 
 // ---- WebSocket --------------------------------------------------------
+function sendAuth() {
+  if (hostToken && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "auth", token: hostToken }));
+}
+
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}`);
+  ws.onopen = sendAuth; // re-auth on every (re)connect
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "state") {
       latestState = msg.state;
       if (typeof msg.filterOn === "boolean") filterOn = msg.filterOn;
       if (typeof msg.cooldownSeconds === "number") cooldownSeconds = msg.cooldownSeconds;
+      if (typeof msg.eventContext === "string") eventContext = msg.eventContext;
       render();
       renderFilter();
       renderCooldown();
+      renderContext();
       syncPlayer();
     }
   };
@@ -134,6 +143,12 @@ function renderCooldown() {
   btn.classList.toggle("on", cooldownSeconds > 0);
 }
 
+function renderContext() {
+  const input = document.getElementById("context-input");
+  // Don't clobber the host's typing with a broadcast echo.
+  if (document.activeElement !== input) input.value = eventContext;
+}
+
 const PAUSE_SVG =
   '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1.5"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.5"/></svg>';
 const PLAY_SVG =
@@ -168,7 +183,23 @@ function wireControls() {
     paintVol();
     if (playerReady) player.setVolume(parseInt(volEl.value, 10));
   };
+  // Event-context editor: the 場景 pill reveals an input; 儲存 sends it.
+  const ctxRow = document.getElementById("context-row");
+  const ctxInput = document.getElementById("context-input");
+  document.getElementById("context-toggle").onclick = () => {
+    ctxRow.classList.toggle("hidden");
+    if (!ctxRow.classList.contains("hidden")) ctxInput.focus();
+  };
+  document.getElementById("context-save").onclick = () => {
+    send({ type: "setEventContext", context: ctxInput.value.trim() });
+    ctxRow.classList.add("hidden");
+  };
+  ctxInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("context-save").click();
+  });
+
   document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return; // typing in the context field
     if (e.code === "Space") { e.preventDefault(); document.getElementById("playpause").click(); }
     if (e.key.toLowerCase() === "n") document.getElementById("skip").click();
   });
@@ -185,6 +216,13 @@ async function loadInfo() {
     renderFilter();
   } catch (err) {
     document.getElementById("guest-url").textContent = "Could not load guest link";
+  }
+  try {
+    // The browser reuses the page's Basic Auth credentials for this fetch.
+    hostToken = (await (await fetch("/api/host-token")).json()).token || null;
+    sendAuth(); // the WS may have connected before the token arrived
+  } catch {
+    /* no password mode, or offline — controls stay open or inert */
   }
 }
 

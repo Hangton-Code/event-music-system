@@ -27,7 +27,11 @@ to the venue's AV system.
 - **Queue guardrails** — duplicate songs, a per-IP request cooldown, and a
   50-song cap keep one guest (or a flaky connection) from spamming the queue.
 - **Live queue** over WebSocket on both the projector and every phone.
-- **Host controls** — play/pause (`space`), skip (`n`), volume, remove tracks.
+- **Host controls** — play/pause (`space`), skip (`n`), volume, remove tracks,
+  per-guest cooldown, and the event context fed to the AI filter (場景 button),
+  so one deployment suits any venue — not just a grad dinner.
+- **Host password** — set `HOST_PASSWORD` in `.env` to lock the projector page
+  and its controls behind a login (recommended on a public domain).
 
 ## Run locally (Bun)
 

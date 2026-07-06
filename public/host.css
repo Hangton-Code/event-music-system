@@ -210,6 +210,34 @@ html, body {
   cursor: pointer;
 }
 
+/* Event-context editor (revealed by the 場景 pill) */
+.context-row { display: flex; gap: 10px; }
+.context-row input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--fill);
+  border: 1px solid var(--line);
+  padding: 0 16px;
+  font: 400 14px/1 var(--sans);
+  color: var(--text);
+}
+.context-row input::placeholder { color: var(--faint); }
+.context-row input:focus { outline: none; border-color: oklch(100% 0 0 / 0.22); }
+.context-row button {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  border: none;
+  background: var(--gold);
+  color: var(--gold-ink);
+  font: 700 14px/1 var(--sans);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.context-row button:hover { background: oklch(84% 0.14 85); }
+
 /* ---- Sidebar ---- */
 .sidebar {
   display: flex;

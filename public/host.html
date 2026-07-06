@@ -50,10 +50,19 @@
         <button id="filter-toggle" class="pill" title="Content filter (LLM)">過濾</button>
         <span id="filter-hint" class="filter-hint hidden">no LLM key — accepts all</span>
         <button id="cooldown-toggle" class="pill" title="Per-guest request cooldown — click to change">冷卻</button>
+        <button id="context-toggle" class="pill" title="活動場景 — tell the AI filter what kind of event this is">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-4.3-6.5-10a6.5 6.5 0 0113 0c0 5.7-6.5 10-6.5 10z"></path><circle cx="12" cy="10.5" r="2.4"></circle></svg>
+          <span>場景</span>
+        </button>
         <div class="vol">
           <svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 9.5v5h3.6l4.9 4V5.5l-4.9 4H4z" fill="currentColor"></path><path d="M16.2 9.3a4.3 4.3 0 010 5.9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"></path><path d="M18.6 6.8a8 8 0 010 10.9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"></path></svg>
           <input id="volume" type="range" min="0" max="100" value="100" />
         </div>
+      </div>
+      <div id="context-row" class="context-row hidden">
+        <input id="context-input" type="text" maxlength="300"
+               placeholder="這是什麼活動？例：a secondary school graduation dinner in Hong Kong / a wedding banquet…" />
+        <button id="context-save">儲存</button>
       </div>
     </section>
 
