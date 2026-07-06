@@ -171,6 +171,12 @@ html, body {
   color: var(--gold-ink);
 }
 #controls button.pill.on:hover { background: oklch(84% 0.14 85); }
+#controls button.pill.strict {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--red-ink);
+}
+#controls button.pill.strict:hover { background: oklch(60% 0.19 28); }
 /* The cooldown pill stays neutral even when active (only the filter pill
    goes gold in the design) — needs #controls to out-specify the .on rule. */
 #controls #cooldown-toggle.pill.on {

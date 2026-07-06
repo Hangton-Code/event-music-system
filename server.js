@@ -8,7 +8,7 @@
 //   2. moderate()       — Gemini approves/rejects on title+channel (fail-open)
 //   3. state.add()      — enqueue; broadcast to all clients over WebSocket
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -41,14 +41,44 @@ const LAN_IP = detectLanIp(process.env.HOST_IP);
 // app runs behind a reverse proxy. Otherwise fall back to LAN IP + port.
 const PUBLIC_BASE = (process.env.PUBLIC_URL || "").replace(/\/+$/, "");
 const GUEST_URL = PUBLIC_BASE ? `${PUBLIC_BASE}/guest` : `http://${LAN_IP}:${PORT}/guest`;
-// Filter (LLM moderation) is runtime-toggleable from the host page. Its initial
-// state comes from ENABLE_MODERATION in .env (default off). When ON but no API
-// key is configured, moderation fails open (accepts everything) — harmless.
-let filterOn = String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true";
-// Event context for the moderation LLM ("what kind of event is this?").
-// Starts from .env, editable live from the host page — one deployment serves
-// different venues. Empty = moderation.js's built-in default.
-let eventContext = process.env.EVENT_CONTEXT || "";
+// --- Persistent host settings ---------------------------------------------
+// Filter on/off, moderation mode, cooldown, and event context are all editable
+// live from the host page and survive restarts in data/settings.json (docker-
+// compose mounts ./data as a volume). The .env values only seed the first boot.
+const DATA_DIR = path.join(__dirname, "data");
+const SETTINGS_PATH = path.join(DATA_DIR, "settings.json");
+let savedSettings = {};
+try {
+  savedSettings = JSON.parse(readFileSync(SETTINGS_PATH, "utf8"));
+} catch {
+  /* first boot — fall back to .env below */
+}
+
+// Filter (LLM moderation): when ON but no API key is configured, moderation
+// fails open (accepts everything) — harmless.
+let filterOn =
+  savedSettings.filterOn ?? String(process.env.ENABLE_MODERATION || "").toLowerCase() === "true";
+// "strict" = family-friendly only; "default" = block non-music/explicit/unfit.
+let moderationMode =
+  savedSettings.moderationMode ??
+  ((process.env.MODERATION_MODE || "").toLowerCase() === "strict" ? "strict" : "default");
+// Event context for the moderation LLM ("what kind of event is this?") — one
+// deployment serves different venues. Empty = moderation.js's built-in default.
+let eventContext = savedSettings.eventContext ?? (process.env.EVENT_CONTEXT || "");
+// Per-guest request cooldown (seconds, 0 = off).
+let cooldownSeconds = savedSettings.cooldownSeconds ?? 15;
+
+function saveSettings() {
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(
+      SETTINGS_PATH,
+      JSON.stringify({ filterOn, moderationMode, eventContext, cooldownSeconds }, null, 2)
+    );
+  } catch (err) {
+    console.warn(`[settings] could not save: ${err.message}`);
+  }
+}
 
 const app = express();
 app.set("trust proxy", true); // behind a reverse proxy — req.ip should read X-Forwarded-For
@@ -85,7 +115,7 @@ const state = new JukeboxState();
 app.get("/api/info", async (_req, res) => {
   try {
     const qr = await QRCode.toDataURL(GUEST_URL, { width: 480, margin: 1 });
-    res.json({ guestUrl: GUEST_URL, qr, filterOn, moderationConfigured: moderationConfigured() });
+    res.json({ guestUrl: GUEST_URL, qr, filterOn, moderationMode, moderationConfigured: moderationConfigured() });
   } catch (err) {
     res.status(500).json({ error: String(err?.message || err) });
   }
@@ -123,13 +153,11 @@ app.get("/api/browse", async (req, res) => {
   }
 });
 
-// Flood control: one request per cooldown window per guest. Keyed on
-// IP + the guest page's persistent clientId — at an event most guests sit
-// behind the venue Wi-Fi's single NAT'd IP, so IP alone would give the whole
-// party one shared cooldown. (clientId is client-chosen, so a determined
+// Flood control: one request per cooldown window (cooldownSeconds) per guest.
+// Keyed on IP + the guest page's persistent clientId — at an event most guests
+// sit behind the venue Wi-Fi's single NAT'd IP, so IP alone would give the
+// whole party one shared cooldown. (clientId is client-chosen, so a determined
 // prankster can rotate it — the host's remove button is the backstop.)
-// The host adjusts the window live from the projector page (0 = off).
-let cooldownSeconds = 15;
 const lastRequestAt = new Map(); // "ip|clientId" -> timestamp of last attempt
 function pruneLastRequestAt() {
   if (lastRequestAt.size <= 500) return;
@@ -202,7 +230,10 @@ app.post("/api/request", async (req, res) => {
   //    category / isFamilySafe / description, then asks the LLM. Fails open.
   if (filterOn) {
     const details = await fetchVideoDetails(videoId); // best-effort, may be null
-    const verdict = await moderate({ title, channel }, details, eventContext ? { eventContext } : {});
+    const verdict = await moderate({ title, channel }, details, {
+      strict: moderationMode === "strict",
+      ...(eventContext ? { eventContext } : {}),
+    });
     if (!verdict.approved) {
       return res.json({ ok: false, reason: verdict.reason });
     }
@@ -241,7 +272,14 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 function stateMessage() {
-  return JSON.stringify({ type: "state", state: state.snapshot(), filterOn, cooldownSeconds, eventContext });
+  return JSON.stringify({
+    type: "state",
+    state: state.snapshot(),
+    filterOn,
+    moderationMode,
+    cooldownSeconds,
+    eventContext,
+  });
 }
 function broadcastState() {
   const msg = stateMessage();
@@ -288,9 +326,11 @@ wss.on("connection", (ws) => {
       case "move":
         state.move(msg.id, msg.dir);
         break;
-      case "setFilter": // host toggled the content filter on/off
+      case "setFilter": // host cycled the content filter: off / on / strict
         filterOn = !!msg.on;
-        console.log(`[host] filter turned ${filterOn ? "ON" : "OFF"}`);
+        if (msg.mode === "strict" || msg.mode === "default") moderationMode = msg.mode;
+        console.log(`[host] filter ${filterOn ? `ON (${moderationMode})` : "OFF"}`);
+        saveSettings();
         broadcastState();
         break;
       case "setCooldown": {
@@ -299,6 +339,7 @@ wss.on("connection", (ws) => {
         if (Number.isFinite(s) && s >= 0 && s <= 300) {
           cooldownSeconds = s;
           console.log(`[host] request cooldown set to ${s ? s + "s" : "OFF"}`);
+          saveSettings();
           broadcastState();
         }
         break;
@@ -306,6 +347,7 @@ wss.on("connection", (ws) => {
       case "setEventContext": // host described the venue/occasion for the filter
         eventContext = (msg.context || "").toString().slice(0, 300);
         console.log(`[host] event context set to: ${eventContext || "(default)"}`);
+        saveSettings();
         broadcastState();
         break;
     }
@@ -317,7 +359,7 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`  Projector (host) : http://localhost:${PORT}/`);
   console.log(`  Guests scan QR   : ${GUEST_URL}`);
   console.log(
-    `  Filter           : ${filterOn ? "ON" : "OFF"} (toggle from host page) · ` +
+    `  Filter           : ${filterOn ? `ON (${moderationMode})` : "OFF"} (change from host page) · ` +
       `LLM ${moderationConfigured() ? "configured" : "NOT configured — filter accepts all"}`
   );
   console.log(

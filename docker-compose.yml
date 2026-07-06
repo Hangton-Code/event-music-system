@@ -11,6 +11,11 @@ services:
     expose:
       - "${PORT:-45416}"
 
+    # Host-page settings (filter/mode/cooldown/event context) persist here
+    # across rebuilds and restarts.
+    volumes:
+      - ./data:/app/data
+
     env_file:
       - .env
     environment:

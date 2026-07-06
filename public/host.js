@@ -7,6 +7,7 @@ let started = false;
 let currentVideoId = null;
 let latestState = { nowPlaying: null, queue: [] };
 let filterOn = false;
+let moderationMode = "default"; // "default" | "strict"
 let moderationConfigured = false;
 let cooldownSeconds = 15;
 let eventContext = "";
@@ -27,6 +28,7 @@ function connectWs() {
     if (msg.type === "state") {
       latestState = msg.state;
       if (typeof msg.filterOn === "boolean") filterOn = msg.filterOn;
+      if (typeof msg.moderationMode === "string") moderationMode = msg.moderationMode;
       if (typeof msg.cooldownSeconds === "number") cooldownSeconds = msg.cooldownSeconds;
       if (typeof msg.eventContext === "string") eventContext = msg.eventContext;
       render();
@@ -131,8 +133,11 @@ const CLOCK_SVG =
 
 function renderFilter() {
   const btn = document.getElementById("filter-toggle");
-  btn.innerHTML = `${SHIELD_SVG}<span>過濾：${filterOn ? "開" : "關"}</span>`;
-  btn.classList.toggle("on", filterOn);
+  const strict = filterOn && moderationMode === "strict";
+  const label = !filterOn ? "關" : strict ? "嚴格" : "開";
+  btn.innerHTML = `${SHIELD_SVG}<span>過濾：${label}</span>`;
+  btn.classList.toggle("on", filterOn && !strict);
+  btn.classList.toggle("strict", strict);
   // Warn if the filter is on but no LLM key is configured (it'll accept all).
   document.getElementById("filter-hint").classList.toggle("hidden", !(filterOn && !moderationConfigured));
 }
@@ -169,7 +174,12 @@ function wireControls() {
     else player.playVideo();
   };
   document.getElementById("skip").onclick = () => send({ type: "skip" });
-  document.getElementById("filter-toggle").onclick = () => send({ type: "setFilter", on: !filterOn });
+  // Filter pill cycles: 關 → 開 (normal) → 嚴格 (family-friendly only) → 關.
+  document.getElementById("filter-toggle").onclick = () => {
+    if (!filterOn) send({ type: "setFilter", on: true, mode: "default" });
+    else if (moderationMode !== "strict") send({ type: "setFilter", on: true, mode: "strict" });
+    else send({ type: "setFilter", on: false, mode: "default" });
+  };
   // Cycle through preset cooldowns; the server echoes the value back via state.
   const COOLDOWN_STEPS = [0, 5, 10, 15, 30, 60];
   document.getElementById("cooldown-toggle").onclick = () => {
@@ -212,6 +222,7 @@ async function loadInfo() {
     document.getElementById("qr").src = info.qr;
     document.getElementById("guest-url").textContent = info.guestUrl.replace(/^https?:\/\//, "");
     filterOn = !!info.filterOn;
+    if (typeof info.moderationMode === "string") moderationMode = info.moderationMode;
     moderationConfigured = !!info.moderationConfigured;
     renderFilter();
   } catch (err) {
