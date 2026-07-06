@@ -89,7 +89,8 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
             " results that are about a different song."
           : "") +
         ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
-        "The reason is short, contains no URLs or citations, and is shown to the guest who requested the song.",
+        "The reason is shown to the guest who requested the song: write it in Traditional Chinese" +
+        " (繁體中文，香港用語), keep it short, and include no URLs or citations.",
     },
     { role: "user", content: ctx },
   ];
@@ -156,24 +157,24 @@ export async function moderate(song, details = null, opts = {}) {
     // a REJECT, not a hiccup: fail closed here, unlike network errors.
     if (choice?.finish_reason === "content_filter") {
       console.warn(`[moderation] provider content_filter — rejecting. ${text.slice(0, 150)}`);
-      return { approved: false, reason: "Not a good fit for this event.", moderated: true };
+      return { approved: false, reason: "這首歌不太適合這個場合。", moderated: true };
     }
     // No structured verdict (refusal prose, missing/invalid JSON): the model
     // dodged the question — reject. Only infrastructure failures fail open.
     const parsed = extractJson(text);
     if (!parsed || typeof parsed.approved !== "boolean") {
       console.warn(`[moderation] no structured verdict — rejecting. ${text.slice(0, 150)}`);
-      return { approved: false, reason: "Not a good fit for this event.", moderated: true };
+      return { approved: false, reason: "這首歌不太適合這個場合。", moderated: true };
     }
     // The web plugin makes models append markdown citation links ("[youtube.com](https://…)");
     // the reason is shown raw to the guest, so drop them.
-    const reason = String(parsed.reason || (parsed.approved ? "Added!" : "Not a good fit for the playlist."))
+    const reason = String(parsed.reason || (parsed.approved ? "Added!" : "這首歌不太適合這個場合。"))
       .replace(/\s*\[[^\]]*\]\([^)]*\)/g, "")
       .replace(/\s*\b(?:see|source|sources)\s*[:.]?\s*$/i, "") // fragment left by a stripped trailing citation
       .trim();
     return {
       approved: parsed.approved,
-      reason: reason || (parsed.approved ? "Added!" : "Not a good fit for the playlist."),
+      reason: reason || (parsed.approved ? "Added!" : "這首歌不太適合這個場合。"),
       moderated: true,
     };
   } catch (err) {
