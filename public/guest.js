@@ -297,7 +297,8 @@ async function requestSong(song, btn) {
   btn.textContent = "…";
   // Persistent, animated "checking" card — with the web-searching filter a
   // verdict can take 5–20s, so it must read as activity, not a frozen toast.
-  const t = toast("info", "🔎", "檢查歌曲中…", { persist: true, sub: "Checking song…", checking: true });
+  // Subline names the song: several checks can be in flight at once.
+  const t = toast("info", "🔎", "檢查歌曲中…", { persist: true, sub: song.title, checking: true });
   try {
     const res = await fetch("/api/request", {
       method: "POST",
