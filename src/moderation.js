@@ -76,7 +76,7 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
             " inappropriate lyrics is a reject; ignore results that are about a different song."
           : "") +
         ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
-        "The reason is short and shown to the guest who requested the song.",
+        "The reason is short, contains no URLs or citations, and is shown to the guest who requested the song.",
     },
     { role: "user", content: ctx },
   ];
@@ -148,6 +148,7 @@ export async function moderate(song, details = null, opts = {}) {
     // the reason is shown raw to the guest, so drop them.
     const reason = String(parsed.reason || (parsed.approved ? "Added!" : "Not a good fit for the playlist."))
       .replace(/\s*\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\s*\b(?:see|source|sources)\s*[:.]?\s*$/i, "") // fragment left by a stripped trailing citation
       .trim();
     return {
       approved: parsed.approved,
