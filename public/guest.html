@@ -1,43 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Add a Song</title>
+  <title>點歌 · Add a Song</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/guest.css" />
 </head>
 <body>
   <header>
-    <h1>🎶 Add a Song</h1>
-    <p>Search YouTube and send a track to the party.</p>
+    <h1>點歌</h1>
+    <div class="h-sub">Add a Song</div>
+    <p>搜尋 YouTube，將歌曲加入派對歌單。<br />Search YouTube and send a track to the party.</p>
   </header>
 
-  <input id="name" class="name-input" type="text" maxlength="40"
-         placeholder="Your name (shown with your song)" autocomplete="off" />
+  <div class="name-wrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.4"></circle><path d="M4.8 20c1.3-4.2 4.2-6.3 7.2-6.3s5.9 2.1 7.2 6.3"></path></svg>
+    <input id="name" type="text" placeholder="你的名字 · your name" autocomplete="off" maxlength="40" />
+  </div>
+  <div class="name-hint">顯示於你點的歌旁 · shown with your song</div>
 
   <form id="search-form">
-    <input id="q" type="search" placeholder="Search for a song or artist…"
+    <input id="q" type="search" placeholder="搜尋歌曲或歌手…"
            autocomplete="off" enterkeyhint="search" />
-    <button type="submit" id="search-btn">Search</button>
+    <button type="submit" id="search-btn" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.3"></circle><path d="M19.5 19.5l-4.3-4.3"></path></svg>
+    </button>
   </form>
-
-  <button id="back-to-explore" class="back-to-explore hidden">← Back to Explore</button>
 
   <section id="suggestions-section">
     <div class="sug-head">
-      <span>🎤 Explore</span>
-      <button id="shuffle" class="shuffle">🔀 Shuffle</button>
+      <span class="sec-title">點唱台 <small>Explore</small></span>
+      <button id="shuffle" class="shuffle">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7h3.8L16 17.2h4.5"></path><path d="M3.5 17h3.8L10 13"></path><path d="M15.5 7h5"></path><path d="M18.2 4.3L20.5 7l-2.3 2.7"></path><path d="M18.2 14.5l2.3 2.5-2.3 2.7"></path></svg>
+        隨機
+      </button>
     </div>
     <div id="singers" class="singers"></div>
     <div id="genre-tabs" class="genre-tabs"></div>
   </section>
 
+  <button id="back-to-explore" class="back-to-explore hidden">← 返回點唱台 · Back to Explore</button>
   <div id="status" class="status hidden"></div>
   <ul id="results"></ul>
-  <button id="more" class="more hidden">More songs ↓</button>
+  <button id="more" class="more hidden">
+    更多歌曲
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"></path></svg>
+  </button>
 
   <section class="queue-section">
-    <h2>Up Next <span id="queue-count" class="count">0</span></h2>
+    <h2>接下來 <small>Up Next</small> <span id="queue-count" class="count">0</span></h2>
     <div id="now-playing" class="now-playing hidden"></div>
     <ul id="queue"></ul>
   </section>

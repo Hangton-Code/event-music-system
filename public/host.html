@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Event Music — Now Playing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/host.css" />
 </head>
 <body>
@@ -24,21 +27,31 @@
         <div id="player"></div>
         <div id="idle" class="hidden">
           <div class="idle-emoji">🎧</div>
-          <p>No songs in the queue.</p>
-          <p class="idle-sub">Scan the QR code to add the first one!</p>
+          <p>暫時未有歌曲</p>
+          <p class="idle-sub">掃描 QR code，點播第一首歌！Scan the QR code to add the first one!</p>
         </div>
       </div>
       <div id="now-meta">
+        <div id="now-label" class="now-label hidden">
+          <span class="eq"><span></span><span></span><span></span></span>
+          <span class="np-zh">現正播放</span>
+          <span class="np-en">Now Playing</span>
+        </div>
         <div id="now-title">—</div>
         <div id="now-channel"></div>
       </div>
       <div id="controls">
-        <button id="playpause" title="Play / Pause (space)">⏸</button>
-        <button id="skip" title="Skip (n)">⏭</button>
-        <button id="filter-toggle" class="pill" title="Content filter (LLM)">🛡 Filter: OFF</button>
+        <button id="playpause" title="Play / Pause (space)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1.5"></rect><rect x="13.5" y="5" width="4.5" height="14" rx="1.5"></rect></svg>
+        </button>
+        <button id="skip" title="Skip (n)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5v14l10-7z"></path><rect x="17" y="5" width="2.6" height="14" rx="1"></rect></svg>
+        </button>
+        <button id="filter-toggle" class="pill" title="Content filter (LLM)">過濾</button>
         <span id="filter-hint" class="filter-hint hidden">no LLM key — accepts all</span>
+        <button id="cooldown-toggle" class="pill" title="Per-guest request cooldown — click to change">冷卻</button>
         <div class="vol">
-          <span>🔊</span>
+          <svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 9.5v5h3.6l4.9 4V5.5l-4.9 4H4z" fill="currentColor"></path><path d="M16.2 9.3a4.3 4.3 0 010 5.9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"></path><path d="M18.6 6.8a8 8 0 010 10.9" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"></path></svg>
           <input id="volume" type="range" min="0" max="100" value="100" />
         </div>
       </div>
@@ -46,13 +59,14 @@
 
     <aside class="sidebar">
       <div class="qr-card">
-        <div class="qr-title">Scan to add a song</div>
-        <img id="qr" alt="QR code" />
+        <div class="qr-title">掃碼點歌</div>
+        <div class="qr-sub">Scan to add a song</div>
+        <div class="qr-frame"><img id="qr" alt="QR code" /></div>
         <div id="guest-url" class="guest-url"></div>
       </div>
       <div class="queue-card">
         <div class="queue-head">
-          Up Next <span id="queue-count" class="count">0</span>
+          接下來 <small>Up Next</small> <span id="queue-count" class="count">0</span>
         </div>
         <ul id="queue"></ul>
       </div>

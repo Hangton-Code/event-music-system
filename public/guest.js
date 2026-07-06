@@ -26,7 +26,18 @@ const GENRE_QUERIES = {
   Party: ["party dance hits official MV", "EDM anthems official MV", "dancefloor classics official MV"],
   Classics: ["Beyond Official MV", "張國榮 MV", "陳慧嫻 MV", "廣東歌 90年代 Official MV"],
 };
-const GENRE_EMOJI = { All: "🔥", "K-pop": "💜", Cantopop: "🎤", Mandopop: "🎵", Western: "🎧", Party: "🪩", Classics: "📼" };
+// Display: Chinese label + inline icon per genre (keys stay English — they
+// index GENRE_QUERIES and the singer-filter slugs).
+const GENRE_LABEL = { All: "全部", "K-pop": "K-pop", Cantopop: "廣東歌", Mandopop: "國語歌", Western: "歐美", Party: "派對", Classics: "經典" };
+const GENRE_ICON = {
+  All: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="7" cy="17" r="2.6"/><circle cx="17" cy="17" r="2.6"/></svg>',
+  "K-pop": '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7.2-4.4-9.7-9.1A5 5 0 0112 5.6a5 5 0 019.7 5.3C19.2 15.6 12 20 12 20z"/></svg>',
+  Cantopop: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="2.8" width="5.4" height="10.5" rx="2.7"/><path d="M6.3 11a5.7 5.7 0 0011.4 0"/><path d="M12 16.7v3.3M9.3 20h5.4"/></svg>',
+  Mandopop: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4v9.6a3.4 3.4 0 101.6 2.9V8.6l5.9-1.4V4l-7.5 2z"/></svg>',
+  Western: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.2"/><path d="M3.8 12h16.4"/><path d="M12 3.8c2.6 2.2 2.6 14.2 0 16.4c-2.6-2.2-2.6-14.2 0-16.4z"/></svg>',
+  Party: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2 6.2h6.4l-5.2 3.9 2 6.4-5.2-4-5.2 4 2-6.4-5.2-3.9h6.4z"/></svg>',
+  Classics: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>',
+};
 const GENRE_SLUG = { "K-pop": "kpop", Cantopop: "canto", Mandopop: "mando", Western: "western", Party: "party", Classics: "classics" };
 
 const SINGERS = [
@@ -84,7 +95,8 @@ function renderGenreTabs() {
   for (const g of Object.keys(GENRE_QUERIES)) {
     const btn = document.createElement("button");
     btn.className = "genre-tab" + (activeKey === `genre:${g}` ? " active" : "");
-    btn.textContent = `${GENRE_EMOJI[g]} ${g}`;
+    btn.innerHTML = `${GENRE_ICON[g]}<span></span>`;
+    btn.querySelector("span").textContent = GENRE_LABEL[g];
     btn.onclick = () => selectGenre(g);
     bar.appendChild(btn);
   }
@@ -137,7 +149,7 @@ async function startBrowse(queries) {
 async function loadMoreSongs() {
   const gen = browse.gen;
   moreBtn.disabled = true;
-  setStatus("Loading songs…");
+  setStatus("載入歌曲中… Loading songs…");
   try {
     while (browse.idx < browse.queries.length) {
       const q = browse.queries[browse.idx++];
@@ -155,7 +167,7 @@ async function loadMoreSongs() {
       break;
     }
     if (browse.gen === gen && browse.seen.size === 0) {
-      setStatus("No songs found — try another tab.");
+      setStatus("沒有找到歌曲 — 試試其他分類。No songs found — try another tab.");
     }
   } catch (err) {
     if (browse.gen === gen) setStatus("😕 " + err.message);
@@ -188,7 +200,7 @@ async function doSearch(q) {
   sugSection.classList.add("hidden"); // hide explore once searching
   moreBtn.classList.add("hidden");
   backToExploreBtn.classList.remove("hidden");
-  setStatus("Searching…");
+  setStatus("搜尋中… Searching…");
   try {
     const res = await fetch("/api/search?q=" + encodeURIComponent(q));
     const data = await res.json();
@@ -243,7 +255,7 @@ function appendResults(results) {
 }
 
 function renderResults(results) {
-  if (results.length === 0) return setStatus("No results. Try a different search.");
+  if (results.length === 0) return setStatus("沒有結果，試試其他關鍵字。No results — try a different search.");
   setStatus("");
   resultsEl.innerHTML = "";
   appendResults(results);
@@ -283,7 +295,7 @@ function rememberMyRequest(id) {
 async function requestSong(song, btn) {
   btn.disabled = true;
   btn.textContent = "…";
-  toast("info", "🔎", "Checking song…", true); // persistent until we get a verdict
+  toast("info", "🔎", "檢查歌曲中…", true, "Checking song…"); // persistent until we get a verdict
   try {
     const res = await fetch("/api/request", {
       method: "POST",
@@ -292,36 +304,82 @@ async function requestSong(song, btn) {
     });
     const data = await res.json();
     if (data.ok) {
-      const where = data.position === 0 ? "playing now" : `#${data.position} in the queue`;
-      toast("ok", "✅", `Added — ${where}!`);
+      const main = data.position === 0 ? "已加入 · 現正播放" : `已加入 · 排第 ${data.position} 首`;
+      const sub = data.position === 0 ? "Added — playing now!" : `Added — #${data.position} in the queue!`;
+      toast("ok", "✓", main, false, sub);
       btn.textContent = "✓";
-      if (data.id) rememberMyRequest(data.id);
+      if (data.id) {
+        rememberMyRequest(data.id);
+        // The queue broadcast usually lands before this response does, so the
+        // row was rendered without knowing it's ours — re-render for the badge.
+        if (lastQueueState) renderQueue(lastQueueState);
+      }
     } else {
-      toast("bad", "🚫", data.reason || "Couldn't add that song.");
+      if (data.retryIn) cooldownToast(data.retryIn);
+      else toast("bad", "🚫", data.reason || "Couldn't add that song.");
       btn.disabled = false;
       btn.textContent = "+";
     }
   } catch (err) {
-    toast("bad", "⚠️", "Network error. Try again.");
+    toast("bad", "⚠️", "網絡錯誤，請再試。", false, "Network error. Try again.");
     btn.disabled = false;
     btn.textContent = "+";
   }
 }
 
-function toast(kind, emoji, text, persist = false) {
+// Toast card: icon circle + Chinese main line + smaller English subline.
+function toastMarkup(icon, main, sub) {
+  toastEl.innerHTML = `
+    <span class="toast-ico"></span>
+    <div><div class="toast-main"></div><div class="toast-sub"></div></div>`;
+  toastEl.querySelector(".toast-ico").textContent = icon;
+  toastEl.querySelector(".toast-main").textContent = main;
+  const subEl = toastEl.querySelector(".toast-sub");
+  if (sub) subEl.textContent = sub;
+  else subEl.remove();
+}
+
+function toast(kind, icon, main, persist = false, sub = "") {
+  clearInterval(cooldownToast._i); // a new toast supersedes a running countdown
   toastEl.className = `toast show ${kind}`;
-  toastEl.innerHTML = `<span class="toast-emoji">${emoji}</span>${text}`;
+  toastMarkup(icon, main, sub);
   clearTimeout(toast._t);
   if (!persist) toast._t = setTimeout(() => (toastEl.className = "toast"), 3800);
 }
 
+// Live countdown shown when the server rejects a request for coming too soon
+// (retryIn = seconds left). Writes toastEl directly so its own ticks don't
+// cancel themselves via toast().
+function cooldownToast(seconds) {
+  clearInterval(cooldownToast._i);
+  clearTimeout(toast._t);
+  let left = seconds;
+  const show = () => {
+    toastEl.className = "toast show bad";
+    toastMarkup("⏳", `再等 ${left} 秒`, `Next song in ${left}s…`);
+  };
+  show();
+  cooldownToast._i = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(cooldownToast._i);
+      toastEl.className = "toast";
+    } else show();
+  }, 1000);
+}
+
 // ---- Live queue (WebSocket) ------------------------------------------
+let lastQueueState = null; // kept so the 你 badge can re-render after an add
+
 function connectWs() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}`);
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.type === "state") renderQueue(msg.state);
+    if (msg.type === "state") {
+      lastQueueState = msg.state;
+      renderQueue(msg.state);
+    }
   };
   ws.onclose = () => setTimeout(connectWs, 2000);
 }
@@ -331,8 +389,18 @@ function renderQueue(state) {
   const npEl = document.getElementById("now-playing");
   if (np) {
     npEl.classList.remove("hidden");
-    npEl.innerHTML = `<div class="np-label">NOW PLAYING</div><div class="np-title"></div>`;
+    npEl.innerHTML = `
+      <img src="${np.thumbnail || NO_THUMB}" alt="" />
+      <div class="np-body">
+        <div class="np-label">
+          <span class="eq"><span></span><span></span><span></span></span>
+          現正播放 NOW PLAYING
+        </div>
+        <div class="np-title"></div>
+        <div class="np-sub"></div>
+      </div>`;
     npEl.querySelector(".np-title").textContent = np.title;
+    npEl.querySelector(".np-sub").textContent = np.channel || "";
   } else {
     npEl.classList.add("hidden");
   }
@@ -342,7 +410,7 @@ function renderQueue(state) {
   const ul = document.getElementById("queue");
   ul.innerHTML = "";
   if (queue.length === 0) {
-    ul.innerHTML = '<li class="q-empty">Nothing queued yet — be the first!</li>';
+    ul.innerHTML = '<li class="q-empty">暫時未有歌曲 — 快啲點歌啦！Nothing queued yet — be the first!</li>';
     return;
   }
   const myIds = loadMyRequestIds();
@@ -350,14 +418,15 @@ function renderQueue(state) {
     const li = document.createElement("li");
     li.innerHTML = `
       <span class="q-num">${i + 1}</span>
-      <div class="q-text"><div class="t"></div><div class="s"></div></div>`;
+      <img src="${item.thumbnail || NO_THUMB}" alt="" loading="lazy" />
+      <div class="q-text"><div class="t-row"><span class="t"></span></div><div class="s"></div></div>`;
     li.querySelector(".t").textContent = item.title;
     li.querySelector(".s").textContent = item.channel;
     if (myIds.has(item.id)) {
       const chip = document.createElement("span");
       chip.className = "q-you";
-      chip.textContent = "YOU";
-      li.appendChild(chip);
+      chip.textContent = "你";
+      li.querySelector(".t-row").appendChild(chip);
     }
     ul.appendChild(li);
   });

@@ -102,16 +102,17 @@ app.get("/api/browse", async (req, res) => {
   }
 });
 
-// Flood control: one request per REQUEST_COOLDOWN_MS per guest. Keyed on
+// Flood control: one request per cooldown window per guest. Keyed on
 // IP + the guest page's persistent clientId — at an event most guests sit
 // behind the venue Wi-Fi's single NAT'd IP, so IP alone would give the whole
 // party one shared cooldown. (clientId is client-chosen, so a determined
 // prankster can rotate it — the host's remove button is the backstop.)
-const REQUEST_COOLDOWN_MS = 15 * 1000;
+// The host adjusts the window live from the projector page (0 = off).
+let cooldownSeconds = 15;
 const lastRequestAt = new Map(); // "ip|clientId" -> timestamp of last attempt
 function pruneLastRequestAt() {
   if (lastRequestAt.size <= 500) return;
-  const cutoff = Date.now() - REQUEST_COOLDOWN_MS;
+  const cutoff = Date.now() - cooldownSeconds * 1000;
   for (const [key, at] of lastRequestAt) {
     if (at < cutoff) lastRequestAt.delete(key);
   }
@@ -136,8 +137,13 @@ app.post("/api/request", async (req, res) => {
   const { videoId, title, channel, duration, thumbnail, name, clientId } = req.body || {};
   const floodKey = `${req.ip}|${(clientId || "").toString().slice(0, 64)}`;
   const last = lastRequestAt.get(floodKey);
-  if (last && Date.now() - last < REQUEST_COOLDOWN_MS) {
-    return res.json({ ok: false, reason: "Slow down — try again in a few seconds." });
+  if (cooldownSeconds > 0 && last) {
+    const waitMs = cooldownSeconds * 1000 - (Date.now() - last);
+    if (waitMs > 0) {
+      const retryIn = Math.ceil(waitMs / 1000);
+      // retryIn lets the guest page show a live countdown.
+      return res.json({ ok: false, reason: `Slow down — try again in ${retryIn}s.`, retryIn });
+    }
   }
 
   if (!videoId || !title) {
@@ -195,7 +201,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 function stateMessage() {
-  return JSON.stringify({ type: "state", state: state.snapshot(), filterOn });
+  return JSON.stringify({ type: "state", state: state.snapshot(), filterOn, cooldownSeconds });
 }
 function broadcastState() {
   const msg = stateMessage();
@@ -238,6 +244,16 @@ wss.on("connection", (ws) => {
         console.log(`[host] filter turned ${filterOn ? "ON" : "OFF"}`);
         broadcastState();
         break;
+      case "setCooldown": {
+        // host adjusted the per-guest request cooldown (0 = off)
+        const s = Math.round(Number(msg.seconds));
+        if (Number.isFinite(s) && s >= 0 && s <= 300) {
+          cooldownSeconds = s;
+          console.log(`[host] request cooldown set to ${s ? s + "s" : "OFF"}`);
+          broadcastState();
+        }
+        break;
+      }
     }
   });
 });
