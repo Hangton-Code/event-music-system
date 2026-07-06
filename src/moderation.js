@@ -75,10 +75,16 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
       content:
         `You moderate song requests for the public music queue at ${eventContext}. ` +
         policy +
+        " If the title marks the video as a clean/censored edit ('clean', 'clean version'," +
+        " 'radio edit'), judge THAT edit: profanity in the original lyrics is bleeped out of it" +
+        " and is not by itself a reason to reject — clean edits of popular songs are usually" +
+        " fine. Still reject if the song's actual subject matter would be unfit for this event" +
+        " even with the words censored." +
         (webSearch
           ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
             " lyrical content and meaning, not just the title. A clean-sounding title with" +
-            " inappropriate lyrics is a reject; ignore results that are about a different song."
+            " inappropriate lyrics is a reject (unless it is a clean edit as above); ignore" +
+            " results that are about a different song."
           : "") +
         ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
         "The reason is short, contains no URLs or citations, and is shown to the guest who requested the song.",
