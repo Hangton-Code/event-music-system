@@ -186,14 +186,27 @@ app.post("/api/request", async (req, res) => {
   res.json({ ok: true, reason: "Added!", position, id: item.id });
 });
 
+// Cloudflare overrides our no-cache with a 4h browser TTL on .js/.css, which
+// left open pages running stale scripts after a deploy. Versioning the asset
+// URLs busts that: each boot (= each deploy) points the HTML at fresh URLs.
+const BOOT_ID = Date.now().toString(36);
+function versionedPage(name) {
+  return readFileSync(path.join(__dirname, "public", name), "utf8").replace(
+    /(href|src)="\/((?:guest|host)\.(?:css|js))"/g,
+    `$1="/$2?v=${BOOT_ID}"`
+  );
+}
+const HOST_PAGE = versionedPage("host.html");
+const GUEST_PAGE = versionedPage("guest.html");
+
 // Host page lives at "/".
 app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "host.html"));
+  res.set("Cache-Control", "no-cache").type("html").send(HOST_PAGE);
 });
 
 // Guest page — the QR code points here (extensionless, so static won't serve it).
 app.get("/guest", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "guest.html"));
+  res.set("Cache-Control", "no-cache").type("html").send(GUEST_PAGE);
 });
 
 // --- WebSocket: real-time queue sync + host controls ---------------------
