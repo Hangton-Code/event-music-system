@@ -144,9 +144,14 @@ export async function moderate(song, details = null, opts = {}) {
       console.warn(`[moderation] no structured verdict — rejecting. ${text.slice(0, 150)}`);
       return { approved: false, reason: "Not a good fit for this event.", moderated: true };
     }
+    // The web plugin makes models append markdown citation links ("[youtube.com](https://…)");
+    // the reason is shown raw to the guest, so drop them.
+    const reason = String(parsed.reason || (parsed.approved ? "Added!" : "Not a good fit for the playlist."))
+      .replace(/\s*\[[^\]]*\]\([^)]*\)/g, "")
+      .trim();
     return {
       approved: parsed.approved,
-      reason: String(parsed.reason || (parsed.approved ? "Added!" : "Not a good fit for the playlist.")),
+      reason: reason || (parsed.approved ? "Added!" : "Not a good fit for the playlist."),
       moderated: true,
     };
   } catch (err) {
