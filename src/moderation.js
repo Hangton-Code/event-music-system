@@ -82,6 +82,10 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
         " the censoring are acceptable; hosts routinely play clean edits at school events." +
         " Reject a clean edit only when the song remains unmistakably unfit, i.e. its core" +
         " subject is still graphic sex or violence." +
+        " Likewise, MILD or incidental profanity in an otherwise benign mainstream song — a few" +
+        " casual swear words in a pop love song (e.g. 'Stay' by The Kid LAROI & Justin Bieber) —" +
+        " is acceptable even in strict mode. Reject for profanity only when it is pervasive and" +
+        " aggressive, or tied to genuinely explicit subject matter." +
         (webSearch
           ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
             " lyrical content and meaning, not just the title. A clean-sounding title with" +
