@@ -28,7 +28,7 @@ There is no lint, build, or test step. Verify changes by running the server and 
 2. `moderate()` — optional LLM filter, only when toggled on from the host page.
 3. `state.add()` — enqueue and broadcast.
 
-**YouTube without an API key** (`src/youtube.js`): search scrapes the public results page and parses `ytInitialData`; video details for moderation come from the watch page's `ytInitialPlayerResponse`. The `SOCS/CONSENT` cookie avoids the EU consent wall. If search breaks, suspect YouTube layout changes. `/api/browse` (guest page genre tabs/singer chips) is the same search but cached 30 min per query and filtered to singles (≤10 min) to exclude compilation videos.
+**YouTube without an API key** (`src/youtube.js`): search queries YouTube Music's internal InnerTube API (the JSON endpoint the music.youtube.com web app uses), filtered to the "Songs" category — music-only results (mostly audio tracks with album art, not music videos) with real artist metadata, whose videoIds play in the regular YouTube iframe. Video details for moderation come from the watch page's `ytInitialPlayerResponse`. The `SOCS/CONSENT` cookie avoids the EU consent wall. If search breaks, suspect InnerTube API/schema changes. `/api/browse` (guest page genre tabs/singer chips) is the same search but cached 30 min per query and filtered to singles (≤10 min) as a backstop against long live/compilation tracks.
 
 **Moderation fail-open vs fail-closed** (`src/moderation.js`) — this distinction is deliberate, preserve it:
 - **Fail-open** (approve) for infrastructure failures only: missing API key, HTTP error, timeout. A moderation outage must never stop the music.

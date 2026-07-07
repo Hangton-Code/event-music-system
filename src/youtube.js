@@ -1,5 +1,8 @@
 // YouTube access without an API key:
-//  - searchYouTube(): scrapes the public results page and parses ytInitialData.
+//  - searchYouTube(): queries YouTube Music's internal search API (InnerTube,
+//    the same JSON endpoint the music.youtube.com web app calls), filtered to
+//    the "Songs" category. Music-only results with real artist/album metadata;
+//    the returned videoIds play in the regular YouTube iframe as usual.
 //  - checkPlayable(): uses the oEmbed endpoint to reject deleted/private videos
 //    before they reach the queue. (Embed-disabled videos still return 200 here,
 //    so the host player ALSO auto-skips on iframe error codes 101/150.)
@@ -18,58 +21,67 @@ const COMMON_HEADERS = {
 
 function pickThumbnail(thumbs) {
   if (!Array.isArray(thumbs) || thumbs.length === 0) return null;
-  // Prefer a medium-sized thumbnail; fall back to the last (largest).
-  return (thumbs.find((t) => t.width >= 200) || thumbs[thumbs.length - 1]).url;
+  // YT Music returns tiny (60/120px) album art, but the size lives in the URL
+  // suffix — ask for a bigger square instead.
+  return thumbs[thumbs.length - 1].url.replace(/=w\d+-h\d+/, "=w320-h320");
 }
 
-export async function searchYouTube(query, { limit = 12, timeoutMs = 8000 } = {}) {
-  const url =
-    "https://www.youtube.com/results?search_query=" +
-    encodeURIComponent(query) +
-    // sp=EgIQAQ%3D%3D filters results to videos only (no channels/playlists).
-    "&sp=EgIQAQ%253D%253D";
+// InnerTube search filter for the "Songs" category (same value ytmusicapi uses).
+const SONGS_FILTER = "EgWKAQIIAWoMEA4QChADEAQQCRAF";
 
+export async function searchYouTube(query, { limit = 12, timeoutMs = 8000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let html;
+  let data;
   try {
-    const res = await fetch(url, { headers: COMMON_HEADERS, signal: controller.signal });
-    if (!res.ok) throw new Error(`YouTube responded ${res.status}`);
-    html = await res.text();
+    const res = await fetch("https://music.youtube.com/youtubei/v1/search?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        ...COMMON_HEADERS,
+        "Content-Type": "application/json",
+        Origin: "https://music.youtube.com",
+        Referer: "https://music.youtube.com/",
+      },
+      body: JSON.stringify({
+        context: {
+          client: { clientName: "WEB_REMIX", clientVersion: "1.20250101.01.00", hl: "en" },
+        },
+        query,
+        params: SONGS_FILTER,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`YouTube Music responded ${res.status}`);
+    data = await res.json();
   } finally {
     clearTimeout(timer);
   }
 
-  const match =
-    html.match(/ytInitialData\s*=\s*({.+?});<\/script>/s) ||
-    html.match(/var ytInitialData = ({.+?});/s);
-  if (!match) {
-    throw new Error("Could not locate ytInitialData (YouTube layout changed or consent wall).");
-  }
-
-  const data = JSON.parse(match[1]);
   const sections =
-    data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
-      ?.contents || [];
+    data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content
+      ?.sectionListRenderer?.contents || [];
 
   const results = [];
   for (const section of sections) {
-    const items = section?.itemSectionRenderer?.contents || [];
-    for (const item of items) {
-      const v = item.videoRenderer;
-      if (!v?.videoId) continue;
-      const isLive = (v.badges || []).some(
-        (b) => b?.metadataBadgeRenderer?.style === "BADGE_STYLE_TYPE_LIVE_NOW"
-      ) || !v.lengthText;
+    for (const item of section?.musicShelfRenderer?.contents || []) {
+      const r = item.musicResponsiveListItemRenderer;
+      const videoId =
+        r?.playlistItemData?.videoId ||
+        r?.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer
+          ?.playNavigationEndpoint?.watchEndpoint?.videoId;
+      if (!videoId) continue;
+      // flexColumns: [0] = title, [1] = "artist • album • duration" as runs.
+      const cols = (r.flexColumns || []).map(
+        (c) => c.musicResponsiveListItemFlexColumnRenderer?.text?.runs || []
+      );
+      const byline = cols[1] || [];
+      const duration = byline.map((run) => run.text).filter((t) => /^\d+:\d\d/.test(t)).pop();
       results.push({
-        videoId: v.videoId,
-        title: v.title?.runs?.map((r) => r.text).join("") || "(untitled)",
-        channel:
-          v.ownerText?.runs?.[0]?.text ||
-          v.longBylineText?.runs?.[0]?.text ||
-          "Unknown",
-        duration: v.lengthText?.simpleText || (isLive ? "LIVE" : ""),
-        thumbnail: pickThumbnail(v.thumbnail?.thumbnails),
+        videoId,
+        title: cols[0]?.map((run) => run.text).join("") || "(untitled)",
+        channel: byline[0]?.text || "Unknown",
+        duration: duration || "",
+        thumbnail: pickThumbnail(r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails),
       });
       if (results.length >= limit) return results;
     }
