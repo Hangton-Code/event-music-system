@@ -43,13 +43,18 @@ export function moderationConfigured() {
 
 function buildMessages(song, details, { strict, eventContext, webSearch }) {
   const policy = strict
-    ? "STRICT mode: approve ONLY clearly family-friendly music, regardless of the venue. Reject anything explicit, sexual, violent, hateful, politically sensitive, or borderline."
+    ? "STRICT mode: approve ONLY clearly family-friendly music, regardless of the venue. " +
+      "NO profanity at all: even a few casual swear words in the lyrics are a reject " +
+      "(e.g. 'Stay' by The Kid LAROI & Justin Bieber is a REJECT in strict mode). " +
+      "Also reject anything sexual, violent, hateful, politically sensitive, or borderline."
     : "Let the NATURE OF THIS EVENT set the bar — what fits a nightclub differs from a school dinner. " +
-      "Reject only what a reasonable host of THIS event would veto: " +
-      "clearly not music (podcast, gameplay, tutorial, talk, news, ASMR, sound effect), " +
-      "or content genuinely inappropriate for this event's audience and setting — e.g. national anthems, " +
-      "political/protest songs, or religious/ceremonial music at an ordinary social event; sexually explicit " +
-      "tracks at a school or family event. " +
+      "ALWAYS reject, at any event: clearly not music (podcast, gameplay, tutorial, talk, news, ASMR, " +
+      "sound effect); lyrics loaded with heavy profanity; songs built on hatred (hate speech, slurs, " +
+      "degrading a group); and political songs (national anthems, protest songs, political messaging). " +
+      "Beyond that, reject what a reasonable host of THIS event would veto — e.g. sexually explicit " +
+      "tracks at a school or family event, religious/ceremonial music at an ordinary social event. " +
+      "A LITTLE casual profanity in an otherwise benign mainstream song is fine " +
+      "(e.g. 'Stay' by The Kid LAROI & Justin Bieber is an APPROVE here). " +
       "At adult venues (nightclubs, bars, adult parties), mainstream music with explicit lyrics or suggestive " +
       "themes IS acceptable — YouTube's isFamilySafe=false is NOT by itself a reason to reject. " +
       "When in doubt about an ordinary pop/party/love song, approve.";
@@ -82,10 +87,6 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
         " the censoring are acceptable; hosts routinely play clean edits at school events." +
         " Reject a clean edit only when the song remains unmistakably unfit, i.e. its core" +
         " subject is still graphic sex or violence." +
-        " Likewise, MILD or incidental profanity in an otherwise benign mainstream song — a few" +
-        " casual swear words in a pop love song (e.g. 'Stay' by The Kid LAROI & Justin Bieber) —" +
-        " is acceptable even in strict mode. Reject for profanity only when it is pervasive and" +
-        " aggressive, or tied to genuinely explicit subject matter." +
         (webSearch
           ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
             " lyrical content and meaning, not just the title. A clean-sounding title with" +
