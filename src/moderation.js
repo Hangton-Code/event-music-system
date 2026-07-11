@@ -91,7 +91,14 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
           ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
             " lyrical content and meaning, not just the title. A clean-sounding title with" +
             " inappropriate lyrics is a reject (unless it is a clean edit as above); ignore" +
-            " results that are about a different song."
+            " results that are about a different song." +
+            // Host's rule: a song whose lyrics can't be checked doesn't play.
+            // This deliberately overrides the approve-when-in-doubt lean above.
+            " If you cannot determine the song's actual lyrical content at all — the" +
+            " search results don't contain its lyrics AND you don't reliably know the" +
+            " song yourself — REJECT it: unverifiable lyrics are not allowed to play," +
+            " even if the title looks harmless. This overrides any approve-when-in-doubt" +
+            " guidance. Purely instrumental tracks are exempt (no lyrics to verify)."
           : "") +
         ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
         "The reason is shown to the guest who requested the song: write it in Traditional Chinese" +
