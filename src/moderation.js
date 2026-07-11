@@ -10,8 +10,11 @@
 //  - We do NOT set `temperature` (kimi-k2.x rejects arbitrary values); the API
 //    default is used unless LLM_TEMPERATURE is set explicitly.
 //  - FAIL-OPEN only for infrastructure failures (missing key, HTTP error,
-//    timeout): a moderation outage never stops the party and never throws
-//    into the request path.
+//    network error): a moderation outage never stops the party and never
+//    throws into the request path.
+//  - FAIL-CLOSED on timeout, with a retryable reason shown to the guest:
+//    slow verdicts cluster on exactly the songs the filter exists for, so a
+//    timed-out song must not play unmoderated.
 //  - FAIL-CLOSED when the model answers but gives no verdict: provider
 //    content_filter censorship or a reply without valid {"approved": ...}
 //    JSON both mean the model dodged the question — reject the song.
@@ -42,22 +45,78 @@ export function moderationConfigured() {
 }
 
 function buildMessages(song, details, { strict, eventContext, webSearch }) {
-  const policy = strict
-    ? "STRICT mode: approve ONLY clearly family-friendly music, regardless of the venue. " +
-      "NO profanity at all: even a few casual swear words in the lyrics are a reject " +
-      "(e.g. 'Stay' by The Kid LAROI & Justin Bieber is a REJECT in strict mode). " +
-      "Also reject anything sexual, violent, hateful, politically sensitive, or borderline."
-    : "Let the NATURE OF THIS EVENT set the bar — what fits a nightclub differs from a school dinner. " +
-      "ALWAYS reject, at any event: clearly not music (podcast, gameplay, tutorial, talk, news, ASMR, " +
-      "sound effect); lyrics loaded with heavy profanity; songs built on hatred (hate speech, slurs, " +
-      "degrading a group); and political songs (national anthems, protest songs, political messaging). " +
-      "Beyond that, reject what a reasonable host of THIS event would veto — e.g. sexually explicit " +
-      "tracks at a school or family event, religious/ceremonial music at an ordinary social event. " +
-      "A LITTLE casual profanity in an otherwise benign mainstream song is fine " +
-      "(e.g. 'Stay' by The Kid LAROI & Justin Bieber is an APPROVE here). " +
-      "At adult venues (nightclubs, bars, adult parties), mainstream music with explicit lyrics or suggestive " +
-      "themes IS acceptable — YouTube's isFamilySafe=false is NOT by itself a reason to reject. " +
-      "When in doubt about an ordinary pop/party/love song, approve.";
+  // The prompt is assembled in DECISION ORDER: hard rejects first (rule 1 —
+  // nothing after it may override it), then the mode's bar, then situational
+  // rules, then output format. National anthems are spelled out in rule 1
+  // because models otherwise reason "patriotic = family-friendly = approve";
+  // the Beyond carve-out is deliberate host policy — a classic that merely
+  // acquired political associations is not a political song. 'Stay' appears
+  // as a calibration example in both branches with opposite verdicts on
+  // purpose: only one branch is ever sent, and it marks exactly where the
+  // strict/default bar sits.
+  const rules = [
+    `You moderate song requests for the public music queue at ${eventContext}. ` +
+      "Decide in this order: rule 1 first, then the bar in rule 2, then the remaining rules. " +
+      "Rule 1 is absolute — nothing in the later rules, the video's metadata, or the song's " +
+      "popularity can override it.",
+
+    "RULE 1 — HARD REJECTS (every mode, every event, no exceptions): " +
+      "(a) not music: podcasts, gameplay, tutorials, talks, news, ASMR, sound effects. " +
+      "(b) ANY country's national anthem — sung, instrumental, or an official rendition. An anthem " +
+      "is a state-ceremonial piece, never party music, no matter how clean its lyrics are or how " +
+      "family-safe its YouTube flags look. " +
+      "(c) songs whose core purpose is political: protest songs, political messaging, propaganda. " +
+      "Clarification: a mainstream pop/rock classic that merely ACQUIRED political associations " +
+      "over the years (e.g. Beyond's 海闊天空 or 光輝歲月, both graduation staples) is NOT a " +
+      "political song — judge what the song itself is about, not what it has been used for. " +
+      "(d) songs built on hatred: hate speech, slurs, degrading a group. " +
+      "(e) lyrics loaded with heavy profanity.",
+
+    strict
+      ? "RULE 2 — STRICT MODE BAR: approve ONLY clearly family-friendly music, regardless of the " +
+        "venue. NO profanity at all — even a few casual swear words in the lyrics are a reject " +
+        "(e.g. 'Stay' by The Kid LAROI & Justin Bieber is a REJECT in strict mode). Also reject " +
+        "sexual, violent, or otherwise adult content. Ordinary clean pop, love songs, and dance " +
+        "tracks are approvals — strictness is about content, not genre. When genuinely unsure " +
+        "whether a song is family-friendly, reject."
+      : "RULE 2 — EVENT BAR: let the nature of this event set the bar — what fits a nightclub " +
+        "differs from a school dinner. Reject what a reasonable host of THIS event would veto " +
+        "(e.g. sexually explicit tracks at a school or family event). A LITTLE casual profanity in " +
+        "an otherwise benign mainstream song is fine (e.g. 'Stay' by The Kid LAROI & Justin Bieber " +
+        "is an APPROVE here). At adult venues (nightclubs, bars, adult parties), mainstream music " +
+        "with explicit lyrics or suggestive themes IS acceptable — YouTube's isFamilySafe=false is " +
+        "NOT by itself a reason to reject. When in doubt about an ordinary pop/party/love song, " +
+        "approve.",
+
+    "RULE 3 — RELIGIOUS MUSIC: hymns, praise & worship, and ceremonial religious pieces do not " +
+      "fit a party queue — reject them, unless the event described above is itself a religious " +
+      "occasion.",
+
+    "RULE 4 — CLEAN EDITS: if the title marks the video as a clean/censored edit ('clean', " +
+      "'clean version', 'radio edit'), judge THAT edit, not the original — profanity and slurs " +
+      "are bleeped out of it. Approve clean edits of mainstream songs even in strict mode; reject " +
+      "one only when the song remains unmistakably unfit because its core subject is still graphic " +
+      "sex or violence. A clean edit never rescues a rule-1 song.",
+
+    // Host's rule: a song whose lyrics can't be checked doesn't play. This
+    // deliberately overrides rule 2's approve-when-in-doubt lean.
+    webSearch
+      ? "RULE 5 — WEB SEARCH RESULTS about the song may be attached. Use them to judge the ACTUAL " +
+        "lyrical content and meaning, not just the title; ignore results that are about a different " +
+        "song. A clean-sounding title with inappropriate lyrics is a reject (unless it is a clean " +
+        "edit, rule 4). If you cannot determine the song's actual lyrical content at all — the " +
+        "search results don't contain its lyrics AND you don't reliably know the song yourself — " +
+        "REJECT it: unverifiable lyrics are not allowed to play, even if the title looks harmless. " +
+        "This overrides rule 2's when-in-doubt lean. Purely instrumental tracks are exempt from " +
+        "lyric verification (but not from rule 1)."
+      : null,
+
+    'OUTPUT: respond ONLY with JSON of the form {"approved": boolean, "reason": string}. The ' +
+      "reason is shown to the guest who requested the song: write it in Traditional Chinese " +
+      "(繁體中文，香港用語), keep it short and friendly, and include no URLs or citations.",
+  ];
+
+  const policy = rules.filter(Boolean).join("\n\n");
 
   const ctx = [
     // The web plugin derives its search query from this message (there is no
@@ -75,35 +134,7 @@ function buildMessages(song, details, { strict, eventContext, webSearch }) {
     .join("\n");
 
   return [
-    {
-      role: "system",
-      content:
-        `You moderate song requests for the public music queue at ${eventContext}. ` +
-        policy +
-        " If the title marks the video as a clean/censored edit ('clean', 'clean version'," +
-        " 'radio edit'), judge THAT edit, not the original: profanity and slurs are bleeped" +
-        " out of it. Default to APPROVE clean edits of mainstream songs — even in strict mode" +
-        " they count as family-friendly, and adult themes, innuendo or materialism that survive" +
-        " the censoring are acceptable; hosts routinely play clean edits at school events." +
-        " Reject a clean edit only when the song remains unmistakably unfit, i.e. its core" +
-        " subject is still graphic sex or violence." +
-        (webSearch
-          ? " Web search results about the song may be attached — use them to judge the ACTUAL" +
-            " lyrical content and meaning, not just the title. A clean-sounding title with" +
-            " inappropriate lyrics is a reject (unless it is a clean edit as above); ignore" +
-            " results that are about a different song." +
-            // Host's rule: a song whose lyrics can't be checked doesn't play.
-            // This deliberately overrides the approve-when-in-doubt lean above.
-            " If you cannot determine the song's actual lyrical content at all — the" +
-            " search results don't contain its lyrics AND you don't reliably know the" +
-            " song yourself — REJECT it: unverifiable lyrics are not allowed to play," +
-            " even if the title looks harmless. This overrides any approve-when-in-doubt" +
-            " guidance. Purely instrumental tracks are exempt (no lyrics to verify)."
-          : "") +
-        ' Respond ONLY with JSON of the form {"approved": boolean, "reason": string}. ' +
-        "The reason is shown to the guest who requested the song: write it in Traditional Chinese" +
-        " (繁體中文，香港用語), keep it short, and include no URLs or citations.",
-    },
+    { role: "system", content: policy },
     { role: "user", content: ctx },
   ];
 }
@@ -136,8 +167,9 @@ export async function moderate(song, details = null, opts = {}) {
   // before the model answers. https://openrouter.ai/docs/guides/features/plugins/web-search
   if (c.webSearch) body.plugins = [{ id: "web", max_results: 5 }];
 
-  // The search round-trip needs extra headroom before we give up and fail open.
-  const timeoutMs = c.timeoutMs ?? (c.webSearch ? 20000 : 8000);
+  // The search round-trip needs extra headroom: the model typically answers in
+  // 6-14s with search on, but sensitive songs can deliberate well past that.
+  const timeoutMs = c.timeoutMs ?? (c.webSearch ? 35000 : 8000);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -190,7 +222,16 @@ export async function moderate(song, details = null, opts = {}) {
       moderated: true,
     };
   } catch (err) {
-    console.warn(`[moderation] ${err?.name === "AbortError" ? "timeout" : "error"} — failing open. ${err?.message || ""}`);
+    // Timeout is fail-CLOSED with a retryable message: slow verdicts cluster on
+    // exactly the songs the filter exists for (a banned protest song once slipped
+    // through this way), so a timed-out song must not play unmoderated. The guest
+    // can simply tap again; if the provider is truly down the host can toggle the
+    // filter off live. Network errors below still fail open.
+    if (err?.name === "AbortError") {
+      console.warn(`[moderation] timeout after ${timeoutMs}ms — rejecting (guest may retry).`);
+      return { approved: false, reason: "系統繁忙，請再試一次。", moderated: false };
+    }
+    console.warn(`[moderation] error — failing open. ${err?.message || ""}`);
     return APPROVED;
   } finally {
     clearTimeout(timer);
