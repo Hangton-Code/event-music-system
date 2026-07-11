@@ -12,25 +12,31 @@ const backToExploreBtn = document.getElementById("back-to-explore");
 // Genre tabs and singer chips run canned YouTube queries via /api/browse
 // (cached server-side), so the songs shown are real and current — not a
 // hardcoded list. "More songs" walks through the query variants.
-// Query phrasing matters: "Official MV"-style queries surface real singles,
-// while generic "熱門歌 2026" / "經典金曲" queries surface hour-long compilation
-// videos (which the server's duration filter then rejects, leaving nothing) —
-// always phrase queries in the "<artist/genre> Official MV / MV" style.
+// Queries are plain genre/artist phrases: the source is YouTube Music's
+// "Songs" search (music-only singles), so no "Official MV" suffix is needed
+// to steer away from compilations — the ≤10 min server filter is the backstop.
 const THIS_YEAR = new Date().getFullYear();
 const GENRE_QUERIES = {
-  All: [`${THIS_YEAR} hit songs official MV`, `廣東歌 Official MV ${THIS_YEAR}`, `K-pop official MV ${THIS_YEAR}`, "party anthems official MV"],
-  "K-pop": [`K-pop official MV ${THIS_YEAR}`, "K-pop dance official MV", "K-pop girl group official MV"],
-  Cantopop: [`廣東歌 Official MV ${THIS_YEAR}`, "香港歌手 新歌 Official MV", "Cantopop official MV"],
-  Mandopop: ["華語 新歌 Official MV", `華語流行 Official MV ${THIS_YEAR}`, "國語 經典 Official MV"],
-  Western: ["top pop hits official MV", `pop official music video ${THIS_YEAR}`, "classic pop anthems official MV"],
-  Party: ["party dance hits official MV", "EDM anthems official MV", "dancefloor classics official MV"],
-  Classics: ["Beyond Official MV", "張國榮 MV", "陳慧嫻 MV", "廣東歌 90年代 Official MV"],
+  // "__hk_hits" is a server-side sentinel (not a search): YouTube's Hong Kong
+  // chart. Generic text queries like "hit songs" rank by literal title match,
+  // not local popularity, so the chart is what makes 全部 show HK hits first.
+  All: ["__hk_hits", `廣東歌 ${THIS_YEAR}`, `K-pop ${THIS_YEAR}`, "party anthems"],
+  // No singer chips for this tab on purpose — graduation songs are a theme,
+  // not an artist roster (no GENRE_SLUG entry, so the singer row stays empty).
+  Graduation: ["畢業歌", "畢業歌 廣東歌", "友誼 畢業 歌曲", "graduation songs"],
+  "K-pop": [`K-pop ${THIS_YEAR}`, "K-pop dance hits", "K-pop girl group hits"],
+  Cantopop: [`廣東歌 ${THIS_YEAR}`, "香港歌手 新歌", "廣東歌 熱門"],
+  Mandopop: ["華語 新歌", `華語流行 ${THIS_YEAR}`, "國語 經典"],
+  Western: ["top pop hits", `pop hits ${THIS_YEAR}`, "classic pop anthems"],
+  Party: ["party dance hits", "EDM anthems", "dancefloor classics"],
+  Classics: ["Beyond 經典", "張國榮", "陳慧嫻", "廣東歌 90年代"],
 };
 // Display: Chinese label + inline icon per genre (keys stay English — they
 // index GENRE_QUERIES and the singer-filter slugs).
-const GENRE_LABEL = { All: "全部", "K-pop": "K-pop", Cantopop: "廣東歌", Mandopop: "國語歌", Western: "歐美", Party: "派對", Classics: "經典" };
+const GENRE_LABEL = { All: "全部", Graduation: "畢業歌", "K-pop": "K-pop", Cantopop: "廣東歌", Mandopop: "國語歌", Western: "歐美", Party: "派對", Classics: "經典" };
 const GENRE_ICON = {
   All: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="7" cy="17" r="2.6"/><circle cx="17" cy="17" r="2.6"/></svg>',
+  Graduation: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5L12 5l9.5 4.5L12 14z"/><path d="M6.5 11.8v4.2c0 1.1 2.5 2.5 5.5 2.5s5.5-1.4 5.5-2.5v-4.2"/><path d="M21.5 9.5v5"/></svg>',
   "K-pop": '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7.2-4.4-9.7-9.1A5 5 0 0112 5.6a5 5 0 019.7 5.3C19.2 15.6 12 20 12 20z"/></svg>',
   Cantopop: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="2.8" width="5.4" height="10.5" rx="2.7"/><path d="M6.3 11a5.7 5.7 0 0011.4 0"/><path d="M12 16.7v3.3M9.3 20h5.4"/></svg>',
   Mandopop: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4v9.6a3.4 3.4 0 101.6 2.9V8.6l5.9-1.4V4l-7.5 2z"/></svg>',
@@ -50,26 +56,80 @@ const SINGERS = [
   { n: "衛蘭", q: "衛蘭 Janice Vidal", g: "canto" },
   { n: "鄭欣宜", q: "鄭欣宜 Joyce Cheng", g: "canto" },
   { n: "Gin Lee", q: "Gin Lee 李幸倪", g: "canto" },
+  { n: "Dear Jane", q: "Dear Jane 樂隊", g: "canto" },
+  { n: "洪嘉豪", q: "洪嘉豪 Kaho Hung", g: "canto" },
+  { n: "曾比特", q: "曾比特 Mike Tsang", g: "canto" },
+  { n: "MIRROR", q: "MIRROR 香港", g: "canto" },
+  { n: "呂爵安", q: "呂爵安 Edan", g: "canto" },
+  { n: "陳蕾", q: "陳蕾 Panther Chan", g: "canto" },
+  { n: "AGA", q: "AGA 江海迦", g: "canto" },
+  { n: "林奕匡", q: "林奕匡 Phil Lam", g: "canto" },
+  { n: "Serrini", q: "Serrini", g: "canto" },
   { n: "周杰倫", q: "周杰倫 Jay Chou", g: "mando" },
   { n: "G.E.M.", q: "鄧紫棋 G.E.M.", g: "mando" },
   { n: "林俊傑", q: "林俊傑 JJ Lin", g: "mando" },
   { n: "五月天", q: "五月天 Mayday", g: "mando" },
+  { n: "蔡依林", q: "蔡依林 Jolin Tsai", g: "mando" },
+  { n: "田馥甄", q: "田馥甄 Hebe Tien", g: "mando" },
+  { n: "周興哲", q: "周興哲 Eric Chou", g: "mando" },
+  { n: "告五人", q: "告五人 Accusefive", g: "mando" },
+  { n: "林宥嘉", q: "林宥嘉 Yoga Lin", g: "mando" },
+  { n: "徐佳瑩", q: "徐佳瑩 LaLa Hsu", g: "mando" },
+  { n: "蘇打綠", q: "蘇打綠 Sodagreen", g: "mando" },
+  { n: "楊丞琳", q: "楊丞琳 Rainie Yang", g: "mando" },
+  { n: "薛之謙", q: "薛之謙 Joker Xue", g: "mando" },
+  { n: "王心凌", q: "王心凌 Cyndi Wang", g: "mando" },
   { n: "NewJeans", q: "NewJeans", g: "kpop" },
   { n: "BTS", q: "BTS", g: "kpop" },
   { n: "BLACKPINK", q: "BLACKPINK", g: "kpop" },
   { n: "aespa", q: "aespa", g: "kpop" },
+  { n: "TWICE", q: "TWICE", g: "kpop" },
+  { n: "SEVENTEEN", q: "SEVENTEEN 세븐틴", g: "kpop" },
+  { n: "Stray Kids", q: "Stray Kids", g: "kpop" },
+  { n: "IVE", q: "IVE 아이브", g: "kpop" },
+  { n: "LE SSERAFIM", q: "LE SSERAFIM", g: "kpop" },
+  { n: "IU", q: "IU 아이유", g: "kpop" },
+  { n: "(G)I-DLE", q: "(G)I-DLE", g: "kpop" },
+  { n: "ITZY", q: "ITZY", g: "kpop" },
+  { n: "ENHYPEN", q: "ENHYPEN", g: "kpop" },
+  { n: "TXT", q: "TOMORROW X TOGETHER", g: "kpop" },
+  { n: "BABYMONSTER", q: "BABYMONSTER", g: "kpop" },
+  { n: "ILLIT", q: "ILLIT", g: "kpop" },
   { n: "Taylor Swift", q: "Taylor Swift", g: "western" },
   { n: "Bruno Mars", q: "Bruno Mars", g: "western" },
   { n: "Ed Sheeran", q: "Ed Sheeran", g: "western" },
   { n: "The Weeknd", q: "The Weeknd", g: "western" },
+  { n: "Billie Eilish", q: "Billie Eilish", g: "western" },
+  { n: "Dua Lipa", q: "Dua Lipa", g: "western" },
+  { n: "Adele", q: "Adele", g: "western" },
+  { n: "Olivia Rodrigo", q: "Olivia Rodrigo", g: "western" },
+  { n: "Ariana Grande", q: "Ariana Grande", g: "western" },
+  { n: "Justin Bieber", q: "Justin Bieber", g: "western" },
+  { n: "Coldplay", q: "Coldplay", g: "western" },
+  { n: "Maroon 5", q: "Maroon 5", g: "western" },
+  { n: "Sabrina Carpenter", q: "Sabrina Carpenter", g: "western" },
+  { n: "Charlie Puth", q: "Charlie Puth", g: "western" },
   { n: "Calvin Harris", q: "Calvin Harris", g: "party" },
   { n: "David Guetta", q: "David Guetta", g: "party" },
   { n: "Avicii", q: "Avicii", g: "party" },
   { n: "Black Eyed Peas", q: "Black Eyed Peas", g: "party" },
+  { n: "The Chainsmokers", q: "The Chainsmokers", g: "party" },
+  { n: "Marshmello", q: "Marshmello", g: "party" },
+  { n: "Alan Walker", q: "Alan Walker", g: "party" },
+  { n: "Kygo", q: "Kygo", g: "party" },
+  { n: "Pitbull", q: "Pitbull", g: "party" },
+  { n: "Zedd", q: "Zedd", g: "party" },
   { n: "Beyond", q: "Beyond", g: "classics" },
   { n: "張國榮", q: "張國榮 Leslie Cheung", g: "classics" },
   { n: "陳慧嫻", q: "陳慧嫻 Priscilla Chan", g: "classics" },
   { n: "譚詠麟", q: "譚詠麟 Alan Tam", g: "classics" },
+  { n: "梅艷芳", q: "梅艷芳 Anita Mui", g: "classics" },
+  { n: "張學友", q: "張學友 Jacky Cheung", g: "classics" },
+  { n: "王菲", q: "王菲 Faye Wong", g: "classics" },
+  { n: "鄧麗君", q: "鄧麗君 Teresa Teng", g: "classics" },
+  { n: "劉德華", q: "劉德華 Andy Lau", g: "classics" },
+  { n: "林憶蓮", q: "林憶蓮 Sandy Lam", g: "classics" },
+  { n: "葉蒨文", q: "葉蒨文 Sally Yeh", g: "classics" },
 ];
 
 const moreBtn = document.getElementById("more");
@@ -107,6 +167,9 @@ function renderSingers() {
   row.innerHTML = "";
   const list =
     activeGenre === "All" ? SINGERS : SINGERS.filter((s) => s.g === GENRE_SLUG[activeGenre]);
+  // Genres without a GENRE_SLUG entry (e.g. Graduation) have no singer roster —
+  // hide the row instead of leaving an empty strip.
+  row.classList.toggle("hidden", list.length === 0);
   for (const s of list) {
     const btn = document.createElement("button");
     btn.className = `singer-chip${activeKey === `singer:${s.n}` ? " active" : ""}`;
@@ -130,7 +193,7 @@ function selectSinger(s) {
   activeKey = `singer:${s.n}`;
   renderGenreTabs();
   renderSingers();
-  startBrowse([`${s.q} official MV`, `${s.q} music video`, `${s.q} MV`]);
+  startBrowse([s.q, `${s.q} 熱門歌曲`, `${s.q} hits`]);
 }
 
 async function startBrowse(queries) {
