@@ -18,7 +18,7 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import QRCode from "qrcode";
 
-import { searchYouTube, checkPlayable, fetchVideoDetails } from "./src/youtube.js";
+import { searchYouTube, fetchChartHits, checkPlayable, fetchVideoDetails } from "./src/youtube.js";
 import { moderate, moderationConfigured } from "./src/moderation.js";
 import { JukeboxState } from "./src/state.js";
 import { detectLanIp } from "./src/net.js";
@@ -142,7 +142,11 @@ app.get("/api/browse", async (req, res) => {
   const hit = browseCache.get(q);
   if (hit && Date.now() - hit.at < BROWSE_TTL_MS) return res.json({ results: hit.results });
   try {
-    const results = (await searchYouTube(q, { limit: 40 }))
+    // "__hk_hits" is a sentinel from the guest page's 全部 tab: serve YouTube's
+    // Hong Kong chart instead of a text search (which can't rank by region).
+    const fetched =
+      q === "__hk_hits" ? await fetchChartHits({ limit: 40 }) : await searchYouTube(q, { limit: 40 });
+    const results = fetched
       .filter((r) => durationSeconds(r.duration) <= MAX_SINGLE_SECONDS)
       .slice(0, 20);
     browseCache.set(q, { at: Date.now(), results });

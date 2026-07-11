@@ -89,6 +89,70 @@ export async function searchYouTube(query, { limit = 12, timeoutMs = 8000 } = {}
   return results;
 }
 
+// YouTube's own "Daily Top Music Videos - Hong Kong" chart playlist — the
+// closest thing to an official HK hit list (YT Music has no song chart for HK).
+const HK_CHART_PLAYLIST = "VLPL4fGSI1pDJn6mlLn-G3Wy5IkOy0c6vAWp";
+
+// Current Hong Kong chart hits, in the same shape as searchYouTube() results.
+// Items are music videos (that's what the chart tracks); they play the same.
+export async function fetchChartHits({ limit = 40, timeoutMs = 8000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let data;
+  try {
+    const res = await fetch("https://music.youtube.com/youtubei/v1/browse?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        ...COMMON_HEADERS,
+        "Content-Type": "application/json",
+        Origin: "https://music.youtube.com",
+        Referer: "https://music.youtube.com/",
+      },
+      body: JSON.stringify({
+        context: {
+          client: { clientName: "WEB_REMIX", clientVersion: "1.20250101.01.00", hl: "en", gl: "HK" },
+        },
+        browseId: HK_CHART_PLAYLIST,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`YouTube Music responded ${res.status}`);
+    data = await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const sections =
+    data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content
+      ?.sectionListRenderer?.contents ||
+    data?.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+      ?.contents ||
+    [];
+
+  const results = [];
+  for (const section of sections) {
+    for (const item of section?.musicPlaylistShelfRenderer?.contents || []) {
+      const r = item.musicResponsiveListItemRenderer;
+      const videoId = r?.playlistItemData?.videoId;
+      if (!videoId) continue;
+      const cols = (r.flexColumns || []).map(
+        (c) => c.musicResponsiveListItemFlexColumnRenderer?.text?.runs || []
+      );
+      results.push({
+        videoId,
+        title: cols[0]?.map((run) => run.text).join("") || "(untitled)",
+        channel: cols[1]?.[0]?.text || "Unknown",
+        duration:
+          r.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text?.runs?.[0]
+            ?.text || "",
+        thumbnail: pickThumbnail(r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails),
+      });
+      if (results.length >= limit) return results;
+    }
+  }
+  return results;
+}
+
 // Returns { ok: true } if the video exists and is publicly available, or
 // { ok: false, reason } for deleted/private/nonexistent IDs.
 export async function checkPlayable(videoId, { timeoutMs = 5000 } = {}) {
