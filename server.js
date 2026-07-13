@@ -319,6 +319,8 @@ wss.on("connection", (ws) => {
       case "error": // host player couldn't play (embed-disabled/region-locked)
         if (msg.type === "error") {
           console.warn(`[host] playback error code ${msg.code} on ${msg.videoId} — skipping`);
+        } else {
+          console.log(`[host] ended ${msg.videoId}`);
         }
         state.advance(msg.videoId);
         break;

@@ -112,12 +112,32 @@ function armPlaybackWatchdog(videoId) {
     if (currentVideoId !== videoId || !playerReady) return;
     const t = player.getCurrentTime ? player.getCurrentTime() : 0;
     const s = player.getPlayerState ? player.getPlayerState() : -1;
-    if (t < 1 && s !== YT.PlayerState.PLAYING && s !== YT.PlayerState.PAUSED) {
-      console.warn(`[watchdog] ${videoId} never started (state ${s}) — skipping`);
-      send({ type: "error", videoId, code: "watchdog" });
+    if (t >= 1 || s === YT.PlayerState.PLAYING || s === YT.PlayerState.PAUSED) return;
+    // A hidden tab can't be the projector — browsers block its autoplay, so
+    // its player sits UNSTARTED forever. Reporting that as an error would skip
+    // the song for everyone. Likewise BUFFERING just means a slow network.
+    // Either way, wait another round instead of skipping.
+    if (document.hidden || s === YT.PlayerState.BUFFERING) {
+      armPlaybackWatchdog(videoId);
+      return;
     }
+    console.warn(`[watchdog] ${videoId} never started (state ${s}) — skipping`);
+    send({ type: "error", videoId, code: "watchdog" });
   }, 20000);
 }
+
+// A page restored from the back-forward cache has lost its autoplay
+// permission: playVideo() fails silently, the player never starts, and the
+// watchdog would skip every song for everyone. Stop driving the player and
+// require a fresh Start click instead.
+window.addEventListener("pageshow", (e) => {
+  if (!e.persisted) return;
+  clearTimeout(playbackWatchdog);
+  started = false;
+  currentVideoId = null;
+  document.getElementById("start-overlay").classList.remove("hidden");
+  document.getElementById("stage").classList.add("hidden");
+});
 
 // ---- Rendering --------------------------------------------------------
 function render() {
