@@ -16,11 +16,13 @@
     <p>搜尋 YouTube，將歌曲加入派對歌單。<br />Search YouTube and send a track to the party.</p>
   </header>
 
+  <div id="now-playing" class="now-playing hidden"></div>
+
   <div class="name-wrap">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.2" r="3.4"></circle><path d="M4.8 20c1.3-4.2 4.2-6.3 7.2-6.3s5.9 2.1 7.2 6.3"></path></svg>
-    <input id="name" type="text" placeholder="你的名字 · your name" autocomplete="off" maxlength="40" />
+    <input id="name" type="text" placeholder="你的名字（可不填）· your name (optional)" autocomplete="off" maxlength="40" />
   </div>
-  <div class="name-hint">顯示於你點的歌旁 · shown with your song</div>
+  <div class="name-hint">可不填 · 顯示於你點的歌旁 · optional, shown with your song</div>
 
   <form id="search-form">
     <input id="q" type="search" placeholder="搜尋歌曲或歌手…"
@@ -52,7 +54,6 @@
 
   <section class="queue-section">
     <h2>接下來 <small>Up Next</small> <span id="queue-count" class="count">0</span></h2>
-    <div id="now-playing" class="now-playing hidden"></div>
     <ul id="queue"></ul>
   </section>
 
