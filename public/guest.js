@@ -487,7 +487,8 @@ function renderQueue(state) {
         <div class="np-sub"></div>
       </div>`;
     npEl.querySelector(".np-title").textContent = np.title;
-    npEl.querySelector(".np-sub").textContent = np.channel || "";
+    npEl.querySelector(".np-sub").textContent =
+      (np.channel || "") + (np.addedBy ? ` · 點唱: ${np.addedBy}` : "");
   } else {
     npEl.classList.add("hidden");
   }
